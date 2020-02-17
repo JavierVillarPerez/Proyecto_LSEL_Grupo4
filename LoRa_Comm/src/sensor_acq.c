@@ -19,35 +19,64 @@ t_device req_sensor_data()
 {
 	t_device ret_data;
 
-	ret_data.sensor.sensor1 = sensor_data1();
-	ret_data.sensor.sensor2 = sensor_data2();
-	ret_data.sensor.sensor3 = sensor_data3();
-	ret_data.ID = 1234;
+	ret_data.sensor1 = sensor_data1();
+	ret_data.sensor2 = sensor_data2();
+	ret_data.sensor3 = sensor_data3();
 
 	return ret_data;
 }
 
 
-int sensor_data1()
+t_sensor sensor_data1()
 {
-	int sensor_value = 0;
+	t_sensor sensor_value;
+	time_t now ;
+	struct tm *local = localtime(&now);
 
-	sensor_value = 10;
+	sensor_value.ID = 1;
+	sensor_value.timestamp.year = local->tm_year;
+	sensor_value.timestamp.month = local->tm_mon;
+	sensor_value.timestamp.day = local->tm_mday;
+	sensor_value.timestamp.hour = local->tm_hour;
+	sensor_value.timestamp.minutes = local->tm_min;
+	sensor_value.measure = 10;
+	sensor_value.alarm = 0;
+
 	return sensor_value;
 }
 
-t_bool sensor_data2()
+t_sensor sensor_data2()
 {
-	t_bool sensor_value = FALSE;
+	t_sensor sensor_value;
+	time_t now ;
+	struct tm *local = localtime(&now);
 
-	sensor_value = TRUE;
+	sensor_value.ID = 2;
+	sensor_value.timestamp.year = local->tm_year;
+	sensor_value.timestamp.month = local->tm_mon;
+	sensor_value.timestamp.day = local->tm_mday;
+	sensor_value.timestamp.hour = local->tm_hour;
+	sensor_value.timestamp.minutes = local->tm_min;
+	sensor_value.measure = 20;
+	sensor_value.alarm = 0;
+
 	return sensor_value;
 }
 
-int sensor_data3()
+t_sensor sensor_data3()
 {
-	int sensor_value = 0;
+	t_sensor sensor_value;
+	time_t now ;
+	struct tm *local = localtime(&now);
 
-	sensor_value = 30;
+	sensor_value.ID = 3;
+	sensor_value.timestamp.year = local->tm_year;
+	sensor_value.timestamp.month = local->tm_mon;
+	sensor_value.timestamp.day = local->tm_mday;
+	sensor_value.timestamp.hour = local->tm_hour;
+	sensor_value.timestamp.minutes = local->tm_min;
+	sensor_value.measure = 30;
+	sensor_value.alarm = 0;
+
 	return sensor_value;
 }

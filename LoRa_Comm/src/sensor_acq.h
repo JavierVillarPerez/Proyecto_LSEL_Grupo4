@@ -12,8 +12,8 @@
 
 
 t_device req_sensor_data();
-int sensor_data1();
-t_bool sensor_data2();
-int sensor_data3();
+t_sensor sensor_data1();
+t_sensor sensor_data2();
+t_sensor sensor_data3();
 
 #endif /* SENSOR_ACQ_H_ */

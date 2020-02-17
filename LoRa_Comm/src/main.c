@@ -27,7 +27,7 @@ int main(void) {
 
 		send_sensor_data(a_data);
 
-		DELAY_ms(10000);
+		DELAY_ms(10000); //Task delay
 	}
 }
 

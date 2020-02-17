@@ -16,12 +16,21 @@
 
 void send_sensor_data(t_device data)
 {
-	printf("Enviando al Gateway la información corresponediente al dispositivo: %d\n" , data.ID);
-	printf("Medidas: \n");
-	printf("Sensor 1: %d\n", data.sensor.sensor1);
-	printf("Sensor 2: %d (Where 0 means not active and 1 means active)\n", data.sensor.sensor2);
-	printf("Sensor 3: %d\n\n\n", data.sensor.sensor3);
+		printf("Enviando al Gateway la información corresponediente al dispositivo: %d\n" , data.sensor1.ID);
+		printf("Medida: %d\n", data.sensor1.measure);
+		printf("Fecha: %d:%d %d/%d/%d\n", data.sensor1.timestamp.hour, data.sensor1.timestamp.minutes, data.sensor1.timestamp.day, data.sensor1.timestamp.month, data.sensor1.timestamp.year);
+		printf("Alarma: %d\n", data.sensor1.alarm);
 
-	printf("Esperando por la siguiente muestra...\n");
+		printf("Enviando al Gateway la información corresponediente al dispositivo: %d\n" , data.sensor2.ID);
+		printf("Medida: %d\n", data.sensor2.measure);
+		printf("Fecha: %d:%d %d/%d/%d\n", data.sensor2.timestamp.hour, data.sensor2.timestamp.minutes, data.sensor2.timestamp.day, data.sensor2.timestamp.month, data.sensor2.timestamp.year);
+		printf("Alarma: %d\n", data.sensor2.alarm);
+
+		printf("Enviando al Gateway la información corresponediente al dispositivo: %d\n" , data.sensor3.ID);
+		printf("Medida: %d\n", data.sensor3.measure);
+		printf("Fecha: %d:%d %d/%d/%d\n", data.sensor3.timestamp.hour, data.sensor3.timestamp.minutes, data.sensor3.timestamp.day, data.sensor3.timestamp.month, data.sensor3.timestamp.year);
+		printf("Alarma: %d\n", data.sensor3.alarm);
+
+		printf("Esperando por la siguiente muestra...\n");
 
 }

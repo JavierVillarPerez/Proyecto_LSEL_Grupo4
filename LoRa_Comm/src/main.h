@@ -8,6 +8,7 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#include <time.h>
 
 typedef enum
 {
@@ -15,20 +16,30 @@ typedef enum
 	TRUE
 }t_bool;
 
+typedef struct s_date
+{
+	int year;
+	int month;
+	int day;
+	int hour;
+	int minutes;
+}t_date;
 
 typedef struct s_sensor
 {
-	int sensor1;
-	t_bool sensor2;
-	int sensor3;
+	t_date timestamp;
+	int measure;
+	int ID;
+	t_bool alarm;
 }t_sensor;
-
 
 typedef struct s_device
 {
-	t_sensor sensor;
-	int ID;
+	t_sensor sensor1;
+	t_sensor sensor2;
+	t_sensor sensor3;
 }t_device;
+
 
 
 void DELAY_ms(uint16_t ms_count);
