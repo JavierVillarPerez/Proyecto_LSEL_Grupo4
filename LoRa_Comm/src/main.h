@@ -41,9 +41,13 @@ typedef struct s_device
 }t_device;
 
 
+enum connexion_state
+{
+	WAIT
+};
 
-void DELAY_ms(uint16_t ms_count);
-void DELAY_us(uint16_t us_count);
+t_bool check_alarm();
+
 
 
 #endif /* MAIN_H_ */

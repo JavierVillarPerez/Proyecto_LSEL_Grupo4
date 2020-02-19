@@ -93,7 +93,7 @@ static void send_data(fsm_t* this)
 	send_sensor_data(a_data);
 
 	timer = 0;
-	timer_start(2000);
+	timer_start(1);
 
 }
 
@@ -138,14 +138,13 @@ int main ()
 
 
 	alarm_state = FALSE;
-	timer_start(10);
 
 	fsm_t* send_wireless_fsm = fsm_new (send_wireless);
 
-	printf("Iniciando proceso...\n");
-
 	while(1)
 	{
+		printf("Iniciando proceso...\n");
+
 		fsm_fire(send_wireless_fsm);
 		gettimeofday (&next_activation, NULL);
 		timeval_add (&next_activation, &next_activation, &clk_period);
