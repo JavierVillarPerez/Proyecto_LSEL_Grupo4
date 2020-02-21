@@ -12,13 +12,14 @@
 #include <stdlib.h>
 #include <time.h>
 #include "sensor_acq.h"
+#include "ring_buf.h"
 
 
-
-t_device req_sensor_data()
+device_buf_t req_sensor_data(int count)
 {
-	t_device ret_data;
+	device_buf_t ret_data;
 
+	ret_data.ID = count;
 	ret_data.sensor1 = sensor_data1();
 	ret_data.sensor2 = sensor_data2();
 	ret_data.sensor3 = sensor_data3();
@@ -33,7 +34,6 @@ t_sensor sensor_data1()
 	time_t now ;
 	struct tm *local = localtime(&now);
 
-	sensor_value.ID = 1;
 	sensor_value.timestamp.year = local->tm_year;
 	sensor_value.timestamp.month = local->tm_mon;
 	sensor_value.timestamp.day = local->tm_mday;
@@ -51,7 +51,6 @@ t_sensor sensor_data2()
 	time_t now ;
 	struct tm *local = localtime(&now);
 
-	sensor_value.ID = 2;
 	sensor_value.timestamp.year = local->tm_year;
 	sensor_value.timestamp.month = local->tm_mon;
 	sensor_value.timestamp.day = local->tm_mday;
@@ -69,7 +68,6 @@ t_sensor sensor_data3()
 	time_t now ;
 	struct tm *local = localtime(&now);
 
-	sensor_value.ID = 3;
 	sensor_value.timestamp.year = local->tm_year;
 	sensor_value.timestamp.month = local->tm_mon;
 	sensor_value.timestamp.day = local->tm_mday;

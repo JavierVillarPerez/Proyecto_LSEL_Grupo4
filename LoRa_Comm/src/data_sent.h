@@ -9,8 +9,9 @@
 #define DATA_SENT_H_
 
 #include "main.h"
+#include "ring_buf.h"
 
-void send_sensor_data(t_device data);
+void send_sensor_data(device_buf_t* data);
 
 
 #endif /* DATA_SENT_H_ */

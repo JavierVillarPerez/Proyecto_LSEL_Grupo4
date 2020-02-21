@@ -20,6 +20,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <signal.h>
+#include "ring_buf.h"
 
 
 static int timer_finished (fsm_t* this);
@@ -28,10 +29,11 @@ static void send_data(fsm_t* this);
 
 
 
-t_device a_data;
+device_buf_t a_data;
 t_bool alarm_state;
 static int timer;
-
+rbuf_t LoRa_ring_buff;
+int count; //VAR FOR DEBUG.
 
 static void timer_isr(union sigval arg)
 {
@@ -87,11 +89,22 @@ static int alarm_ON(fsm_t* this)
 static void send_data(fsm_t* this)
 {
 	printf("Reading data...\n");
-	a_data = req_sensor_data(); //ONLY FOR TEST, DATA WILL BE MODIFIED BY THE SENSOR FSM
-
+	a_data = req_sensor_data(count); //ONLY FOR TEST, DATA WILL BE MODIFIED BY THE SENSOR FSM
+	printf("contador: %d\n",count);
+	if (count < 9)
+	{
+		count++;
+	}
 	printf("Sending data...\n");
-	send_sensor_data(a_data);
-
+	ringbuf_put(&LoRa_ring_buff, &a_data);
+	
+	printf("Devices saved in the ring buffer: \n");
+	for(int i = 0; i<9; i++)
+	{
+		printf("Device ID: %d\n", LoRa_ring_buff.buf[LoRa_ring_buff.tail].ID);
+		LoRa_ring_buff.tail++;
+	}
+	LoRa_ring_buff.tail = 0;
 	timer = 0;
 	timer_start(2000);
 
@@ -136,12 +149,11 @@ int main ()
   struct timeval clk_period = { 0, 250 * 1000 };
   struct timeval next_activation;
 
-
 	alarm_state = FALSE;
 	timer_start(10);
 
 	fsm_t* send_wireless_fsm = fsm_new (send_wireless);
-
+	ringbuf_init(&LoRa_ring_buff, RBUF_SIZE);
 	printf("Iniciando proceso...\n");
 
 	while(1)
