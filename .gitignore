@@ -6,6 +6,9 @@
 *.exe
 *.o
 *.so
+*.d
+*.mk
+
 
 # Logs and databases #
 ######################
