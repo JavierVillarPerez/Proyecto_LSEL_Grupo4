@@ -26,7 +26,6 @@ int main(void) {
 	int opt = 1;
 	int addrlen = sizeof(address);
 	device_buf_t buffer[1024] = {0};
-	char *hello = "Hello from server";
 
 	// Creating socket file descriptor
 	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -76,10 +75,11 @@ int main(void) {
 			printf("Device received sensor1 measure: %d\n",buffer[0].sensor1.measure);
 			printf("Device received sensor2 measure: %d\n",buffer[0].sensor2.measure );
 			printf("Device received sensor3 measure: %d\n",buffer[0].sensor3.measure );
-
+			/*
+			To send data to de client:
 			send(new_socket , hello , strlen(hello) , 0 );
-			printf("Hello message sent\n");
-    	}
+			*/
+		}
     }
 return 0;
 }

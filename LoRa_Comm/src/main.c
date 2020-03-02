@@ -30,8 +30,7 @@
 static int timer_finished (fsm_t* this);
 static int alarm_ON(fsm_t* this);
 static void send_data(fsm_t* this);
-//static void socket_init(void);
-
+static void new_socket();
 
 
 device_buf_t a_data;
@@ -105,39 +104,23 @@ static void send_data(fsm_t* this)
 
 	printf("Reading data...\n");
 
-	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
-        printf("\n Socket creation error \n");
-        socket_error = TRUE;
-    }
+	new_socket(); //SOCKET FOR DEMO COMMUNICATION.
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-
-    // Convert IPv4 and IPv6 addresses from text to binary form
-    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0)
-    {
-        printf("\nInvalid address/ Address not supported \n");
-        socket_error = TRUE;
-    }
-
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-        printf("\nConnection Failed \n");
-        socket_error = TRUE;
-    }
-
-	a_data = req_sensor_data(count); //ONLY FOR TEST, DATA WILL BE MODIFIED BY THE SENSOR FSM
+	/*ONLY FOR TEST, DATA WILL BE MODIFIED BY THE SENSOR FSM*/
+	a_data = req_sensor_data(count);
 	count++;
-	printf("count: %d\n", count);
+
+	/*RING BUF PUT AND GET (NEVER OVERFLOW)*/
 	ringbuf_put(&LoRa_ring_buff, &a_data);
 	printf("Device ID: %d\n", LoRa_ring_buff.buf[LoRa_ring_buff.tail].ID);
 	ringbuf_get(&LoRa_ring_buff, &device);
 
+	/*SEND DATA TO THE SERVER*/
     send(sock , &device , sizeof(device) , 0 );
     printf("Device sent ID: %d\n", device.ID);
 
 	timer = 0;
+	/*TIME OF 2 seconds for the next sent*/
 	timer_start(2000);
 
 }
@@ -163,8 +146,6 @@ void timeval_add (struct timeval *res, struct timeval *a, struct timeval *b)
 }
 
 
-
-
 // Wait until next_activation (absolute time)
 void delay_until (struct timeval* next_activation)
 {
@@ -185,8 +166,6 @@ int main ()
     alarm_state = FALSE;
 	timer_start(10);
 
-
-
 	//socket_init();
 	fsm_t* send_wireless_fsm = fsm_new (send_wireless);
 	ringbuf_init(&LoRa_ring_buff, RBUF_SIZE);
@@ -202,6 +181,30 @@ int main ()
 	}
 }
 
+void new_socket()
+{
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		printf("\n Socket creation error \n");
+		socket_error = TRUE;
+	}
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(PORT);
+
+	// Convert IPv4 and IPv6 addresses from text to binary form
+	if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0)
+	{
+		printf("\nInvalid address/ Address not supported \n");
+		socket_error = TRUE;
+	}
+
+	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+	{
+		printf("\nConnection Failed \n");
+		socket_error = TRUE;
+	}
+}
 
 t_bool check_alarm()
 {

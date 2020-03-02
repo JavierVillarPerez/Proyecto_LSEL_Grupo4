@@ -36,19 +36,11 @@ void ringbuf_put(rbuf_t* _this, device_buf_t *item)
 {
 	_this->buf[_this->head] = *item;
 	if(NEXT(_this->head) != 0)
-	{ //SOLO GUARDA LOS RBUF_SIZE PRIMEROS. LOS DEMÁS LOS DESCARTA POR AHORA
+	{
 		_this->head++;
 	}
 	else _this->head = 0;
 }
-
-//void ringbuf_put(rbuf_t* _this, device_buf_t *item)
-//{
-//  if(NEXT(_this->buf[_this->head]) != 0){
-//  _this->buf[_this->head] = item;
-//  _this->head++;
-//  }
-//}
 
 /*RingBuffer Get value*/
 device_buf_t ringbuf_get(rbuf_t* _this, device_buf_t *item)
@@ -60,7 +52,6 @@ device_buf_t ringbuf_get(rbuf_t* _this, device_buf_t *item)
 		*item = _this->buf[_this->tail];
 		if (NEXT(_this->tail) != 0)
 		{
-			// get item element
 			_this->tail++;
 		}
 		else _this->tail = 0;
