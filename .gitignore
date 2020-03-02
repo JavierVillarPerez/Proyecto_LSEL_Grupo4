@@ -27,3 +27,5 @@ ehthumbs.db
 Thumbs.db
 /.metadata/
 .metadata
+.cproject
+.xml
