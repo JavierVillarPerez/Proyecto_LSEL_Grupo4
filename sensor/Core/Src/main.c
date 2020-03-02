@@ -53,13 +53,13 @@ SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 
-// #define range 1000
-const int16_t range_ph_acido  = 2;  	// Para prueba
-const int16_t range_ph_basico = 5;		// Para prueba
-const int16_t t_warning = 2000;    		//tiempo prefijado para aviso
-const int16_t t_measure = 1000;			// tiempo prefijado para medir
-const int16_t t_sleep   =10000;			// tiempo prefijado para sleep
-const int16_t v_measure = 4;			// veces que se mide el sensor
+#define range_ph_acido 2 	 	// Para prueba
+#define range_ph_basico 5		// Para prueba
+#define t_warning 2000    		//tiempo prefijado para aviso
+#define t_measure 1000			// tiempo prefijado para medir
+#define t_sleep 10000			// tiempo prefijado para sleep
+#define v_measure 4				// veces que se mide el sensor
+
 enum sensor_state {
 	  Measure,
 	  Warning,
