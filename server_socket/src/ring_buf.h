@@ -11,9 +11,15 @@
 #ifndef RING_BUF_H_
 #define RING_BUF_H_
 
-#include "main.h"
-
 #define RBUF_SIZE 10
+
+
+typedef enum
+{
+	FALSE = 0,
+	TRUE
+}t_bool;
+
 
 typedef struct s_date
 {

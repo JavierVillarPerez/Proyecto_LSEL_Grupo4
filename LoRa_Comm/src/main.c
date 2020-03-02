@@ -1,10 +1,10 @@
 /*
  ============================================================================
- Name        : Tx_project.c
+ Name        : main.c
  Author      : Javier Villar Pérez
  Version     :
  Copyright   : Your copyright notice
- Description : Hello LoRa, Ansi-style
+ Description : main template. LoRa Demo communication
  ============================================================================
  */
 
@@ -14,7 +14,6 @@
 #include "main.h"
 #include "fsm.h"
 #include "sensor_acq.h"
-#include "data_sent.h"
 #include <assert.h>
 #include <unistd.h>
 #include <sys/select.h>
@@ -22,10 +21,16 @@
 #include <signal.h>
 #include "ring_buf.h"
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+#define PORT 8080
 
 static int timer_finished (fsm_t* this);
 static int alarm_ON(fsm_t* this);
 static void send_data(fsm_t* this);
+//static void socket_init(void);
 
 
 
@@ -34,6 +39,15 @@ t_bool alarm_state;
 static int timer;
 rbuf_t LoRa_ring_buff;
 int count; //VAR FOR DEBUG.
+
+device_buf_t device;
+
+int sock;
+int valread;
+struct sockaddr_in serv_addr;
+char buffer[1024] = {0};
+
+t_bool socket_error;
 
 static void timer_isr(union sigval arg)
 {
@@ -88,23 +102,41 @@ static int alarm_ON(fsm_t* this)
 
 static void send_data(fsm_t* this)
 {
+
 	printf("Reading data...\n");
+
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        printf("\n Socket creation error \n");
+        socket_error = TRUE;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT);
+
+    // Convert IPv4 and IPv6 addresses from text to binary form
+    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0)
+    {
+        printf("\nInvalid address/ Address not supported \n");
+        socket_error = TRUE;
+    }
+
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("\nConnection Failed \n");
+        socket_error = TRUE;
+    }
+
 	a_data = req_sensor_data(count); //ONLY FOR TEST, DATA WILL BE MODIFIED BY THE SENSOR FSM
-	printf("contador: %d\n",count);
-	if (count < 9)
-	{
-		count++;
-	}
-	printf("Sending data...\n");
+	count++;
+	printf("count: %d\n", count);
 	ringbuf_put(&LoRa_ring_buff, &a_data);
-	
-	printf("Devices saved in the ring buffer: \n");
-	for(int i = 0; i<9; i++)
-	{
-		printf("Device ID: %d\n", LoRa_ring_buff.buf[LoRa_ring_buff.tail].ID);
-		LoRa_ring_buff.tail++;
-	}
-	LoRa_ring_buff.tail = 0;
+	printf("Device ID: %d\n", LoRa_ring_buff.buf[LoRa_ring_buff.tail].ID);
+	ringbuf_get(&LoRa_ring_buff, &device);
+
+    send(sock , &device , sizeof(device) , 0 );
+    printf("Device sent ID: %d\n", device.ID);
+
 	timer = 0;
 	timer_start(2000);
 
@@ -149,21 +181,27 @@ int main ()
   struct timeval clk_period = { 0, 250 * 1000 };
   struct timeval next_activation;
 
-	alarm_state = FALSE;
+  	socket_error = FALSE;
+    alarm_state = FALSE;
 	timer_start(10);
 
+
+
+	//socket_init();
 	fsm_t* send_wireless_fsm = fsm_new (send_wireless);
 	ringbuf_init(&LoRa_ring_buff, RBUF_SIZE);
 	printf("Iniciando proceso...\n");
 
 	while(1)
 	{
+		if(socket_error) return -1;
 		fsm_fire(send_wireless_fsm);
 		gettimeofday (&next_activation, NULL);
 		timeval_add (&next_activation, &next_activation, &clk_period);
 		delay_until (&next_activation);
 	}
 }
+
 
 t_bool check_alarm()
 {

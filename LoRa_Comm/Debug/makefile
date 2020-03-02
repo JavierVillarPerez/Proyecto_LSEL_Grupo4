@@ -23,19 +23,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: Tx_project.exe
+all: LoRa_Comm.exe
 
 # Tool invocations
-Tx_project.exe: $(OBJS) $(USER_OBJS)
+LoRa_Comm.exe: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cygwin C Linker'
-	gcc  -o "Tx_project.exe" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc  -o "LoRa_Comm.exe" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) Tx_project.exe
+	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) LoRa_Comm.exe
 	-@echo ' '
 
 .PHONY: all clean dependents

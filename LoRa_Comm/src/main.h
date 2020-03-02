@@ -1,8 +1,11 @@
 /*
- * main.h
- *
- *  Created on: 16 feb. 2020
- *      Author: villa
+ ============================================================================
+ Name        : main.h
+ Author      : Javier Villar Pérez
+ Version     :
+ Copyright   : Your copyright notice
+ Description : main template
+ ============================================================================
  */
 
 #ifndef MAIN_H_
