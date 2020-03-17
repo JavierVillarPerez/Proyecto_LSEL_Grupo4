@@ -1,5 +1,12 @@
-#ifndef FSM_H
-#define FSM_H
+/*
+ * fsm.h
+ *
+ *  Created on: Mar 10, 2020
+ *      Author: villa
+ */
+
+#ifndef INC_FSM_H_
+#define INC_FSM_H_
 
 typedef struct fsm_t fsm_t;
 
@@ -22,4 +29,7 @@ fsm_t* fsm_new (fsm_trans_t* tt);
 void fsm_init (fsm_t* this, fsm_trans_t* tt);
 void fsm_fire (fsm_t* this);
 
-#endif
+
+#endif /* INC_FSM_H_ */
+
+

@@ -24,6 +24,8 @@
 #include "fsm.h"
 #include <stdlib.h>
 #include <time.h>
+#include "fsm_sensor.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -151,7 +153,9 @@ static fsm_trans_t sensor[]= {
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  sensor_t fsm_sensor1;
+  sensor_t fsm_sensor2;
+  sensor_t fsm_sensor3;
   /* USER CODE END 1 */
   
 
@@ -179,9 +183,13 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_HOST_Init();
   /* USER CODE BEGIN 2 */
-  	  fsm_t sensor_fsm;
-  	  fsm_t* my_fsm = &sensor_fsm;
-  	  fsm_init(my_fsm, sensor);
+  fsm_sensor_init(sensor, &fsm_sensor1,  TRUE, FALSE, 0, 20000, 5000, FALSE, 5, 2, 10);
+ // fsm_sensor_init(sensor, &fsm_sensor2,  TRUE, FALSE, 0, 20000, 5000, FALSE, 5, 2, 10);
+ // fsm_sensor_init(sensor, &fsm_sensor3,  TRUE, FALSE, 0, 20000, 5000, FALSE, 5, 2, 10);
+
+//  	  fsm_t sensor_fsm;
+//  	  fsm_t* my_fsm = &sensor_fsm;
+//  	  fsm_init(my_fsm, sensor);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -190,7 +198,9 @@ int main(void)
   {
     /* USER CODE END WHILE */
     MX_USB_HOST_Process();
-    fsm_fire (my_fsm);
+    fsm_fire (fsm_sensor1.fsm);
+   // fsm_fire (fsm_sensor2.fsm);
+    //fsm_fire (fsm_sensor3.fsm);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
