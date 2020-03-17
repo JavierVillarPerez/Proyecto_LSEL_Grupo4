@@ -36,13 +36,16 @@ default.size.stdout \
 OBJDUMP_LIST += \
 sensor.list \
 
+OBJCOPY_BIN += \
+sensor.bin \
+
 
 # All Target
 all: sensor.elf secondary-outputs
 
 # Tool invocations
-sensor.elf: $(OBJS) $(USER_OBJS) C:\Users\ya111\Desktop\Master\LSEL\Proyecto_LSEL_Grupo4\sensor\STM32F411VETX_FLASH.ld
-	arm-none-eabi-gcc -o "sensor.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\ya111\Desktop\Master\LSEL\Proyecto_LSEL_Grupo4\sensor\STM32F411VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="sensor.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+sensor.elf: $(OBJS) $(USER_OBJS) D:\Usuarios\Documents\Universidad\LSEL\Proyecto_LSEL_Grupo4\sensor\STM32F411VETX_FLASH.ld
+	arm-none-eabi-gcc -o "sensor.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Usuarios\Documents\Universidad\LSEL\Proyecto_LSEL_Grupo4\sensor\STM32F411VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="sensor.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -56,12 +59,17 @@ sensor.list: $(EXECUTABLES)
 	@echo 'Finished building: $@'
 	@echo ' '
 
+sensor.bin: $(EXECUTABLES)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "sensor.bin"
+	@echo 'Finished building: $@'
+	@echo ' '
+
 # Other Targets
 clean:
 	-$(RM) *
 	-@echo ' '
 
-secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)
+secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)
 
 .PHONY: all clean dependents
 .SECONDARY:
