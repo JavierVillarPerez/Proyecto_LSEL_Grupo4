@@ -21,13 +21,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_host.h"
-#include "fsm.h"
-#include <stdlib.h>
-#include <time.h>
-#include "fsm_sensor.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "fsm.h"
+#include "fsm_sensor.h"
 
 /* USER CODE END Includes */
 
@@ -38,6 +36,15 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define range_ph_acido 750 	 	// Only for test, real value is 2.
+#define range_ph_basico 800		// Only for test, real value is 5.
+#define range_ph_max 900		// Only for test, real value is 14.
+#define ph_warning_period 500  	// Test time to alarm.
+#define ph_measure_period 200	// Test time to measure.
+#define ph_sleep_period 3000	// Test time to sleep
+#define ph_setup_period 500		// Test time to setting up
+#define ph_average 4			// number of measurements to make for 1 measure.
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,104 +53,34 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 
-I2S_HandleTypeDef hi2s2;
 I2S_HandleTypeDef hi2s3;
 
 SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 
-#define range_ph_acido 2 	 	// Para prueba
-#define range_ph_basico 5		// Para prueba
-#define t_warning 2000    		//tiempo prefijado para aviso
-#define t_measure 1000			// tiempo prefijado para medir
-#define t_sleep 10000			// tiempo prefijado para sleep
-#define v_measure 4				// veces que se mide el sensor
-
-enum sensor_state {
-	  Measure,
-	  Warning,
-	  Process,
-	  Sleeping
-	};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_I2S2_Init(void);
 static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_ADC1_Init(void);
 void MX_USB_HOST_Process(void);
 
 /* USER CODE BEGIN PFP */
-static int Data = 0;
-static int cont = 0;
-static int alarma = 0;
-static int time_warning ;   	// Tiempo de aviso
-static int time_measure ;		// Tiempo de medida
-static int time_sleep   ;		// Tiempo de sleep
-static int range (fsm_t* this) { if (Data > range_ph_basico || Data < range_ph_acido ) return 1; else return 0; }
-static int no_range (fsm_t* this) { if (Data <= range_ph_basico && Data >= range_ph_acido ) return 1; else return 0; }
-static int timer_sleep (fsm_t* this) { return (HAL_GetTick()>time_sleep);}
-static int timer_warning (fsm_t* this) { return (HAL_GetTick()>time_warning);}
-static int timer_measure (fsm_t* this) { return (HAL_GetTick()>time_measure);}
-static int contador (fsm_t* this) { if(cont==(v_measure)) return 1; else return 0;}
 
-static void measuring (fsm_t* this) { // led blue
-	time_t t;
-	int new_data = rand() % 5;
-	srand((unsigned) time(&t));
-	Data = Data + new_data;
-	cont = cont+1;
-	time_measure = HAL_GetTick()+ t_measure;
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, 1);  // Simula la alimentacion del sensor y estado de measure
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0); // prueba
-		HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, 0); // prueba
-		HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, 0); // prueba
-}
-
-static void process_data (fsm_t* this) { // led green
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0); // Simula el estado de process
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, 0); // Simula el estado de sleep
-	HAL_GPIO_WritePin(LD5_GPIO_Port, LD6_Pin, 0); // prueba
-	HAL_GPIO_WritePin(LD4_GPIO_Port, LD6_Pin, 1); // prueba
-	cont = 0;
-	Data = Data/v_measure;
-}
-static void alert (fsm_t* this) { // led red
-	alarma = 1;
-	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, 1); // Simula el aviso
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0); // prueba
-		HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, 0); // prueba
-		HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, 0); // prueba
-	time_warning = HAL_GetTick()+t_warning;
-}
-static void sleep (fsm_t* this) { // led orange
-	alarma = 0;
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 1); // Simula el estado de sleep
-	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, 0); // prueba
-	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, 0); // Apaga el led de aviso
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, 0); // Apaga la alimentacion
-	time_sleep = HAL_GetTick()+t_sleep;
-}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-static fsm_trans_t sensor[]= {
-  { Sleeping, timer_sleep, Measure, measuring},
-  { Measure, timer_measure, Measure, measuring},
-  { Measure, contador, Process, process_data},
-  { Process, range, Warning, alert},
-  { Process, no_range, Sleeping, sleep},
-  { Warning, timer_warning, Sleeping, sleep},
-  {-1, NULL, -1, NULL },
-};
 /* USER CODE END 0 */
 
 /**
@@ -153,11 +90,16 @@ static fsm_trans_t sensor[]= {
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  sensor_t fsm_sensor1;
-  sensor_t fsm_sensor2;
-  sensor_t fsm_sensor3;
+
+  fsm_sensor_t fsm_s1;
+//  fsm_sensor_t fsm_s2;
+//  fsm_sensor_t fsm_s3;
+
+  sensor_t sensor1;
+//  sensor_t sensor2;
+//  sensor_t sensor3;
+
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -178,18 +120,15 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-  MX_I2S2_Init();
   MX_I2S3_Init();
   MX_SPI1_Init();
   MX_USB_HOST_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  fsm_sensor_init(sensor, &fsm_sensor1,  TRUE, FALSE, 0, 20000, 5000, FALSE, 5, 2, 10);
- // fsm_sensor_init(sensor, &fsm_sensor2,  TRUE, FALSE, 0, 20000, 5000, FALSE, 5, 2, 10);
- // fsm_sensor_init(sensor, &fsm_sensor3,  TRUE, FALSE, 0, 20000, 5000, FALSE, 5, 2, 10);
 
-//  	  fsm_t sensor_fsm;
-//  	  fsm_t* my_fsm = &sensor_fsm;
-//  	  fsm_init(my_fsm, sensor);
+  sensor_initialization(&sensor1, Sensor_Supply_Pin, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_warning_period, ph_sleep_period, ph_measure_period, ph_average);
+  fsm_sensor_init(&fsm_s1, &sensor1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -198,10 +137,9 @@ int main(void)
   {
     /* USER CODE END WHILE */
     MX_USB_HOST_Process();
-    fsm_fire (fsm_sensor1.fsm);
-   // fsm_fire (fsm_sensor2.fsm);
-    //fsm_fire (fsm_sensor3.fsm);
+
     /* USER CODE BEGIN 3 */
+    fsm_fire(&fsm_s1.fsm);
   }
   /* USER CODE END 3 */
 }
@@ -226,10 +164,10 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 192;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
-  RCC_OscInitStruct.PLL.PLLQ = 8;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -241,20 +179,69 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
-  PeriphClkInitStruct.PLLI2S.PLLI2SN = 200;
-  PeriphClkInitStruct.PLLI2S.PLLI2SM = 5;
+  PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
   PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_10B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -288,40 +275,6 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief I2S2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2S2_Init(void)
-{
-
-  /* USER CODE BEGIN I2S2_Init 0 */
-
-  /* USER CODE END I2S2_Init 0 */
-
-  /* USER CODE BEGIN I2S2_Init 1 */
-
-  /* USER CODE END I2S2_Init 1 */
-  hi2s2.Instance = SPI2;
-  hi2s2.Init.Mode = I2S_MODE_MASTER_TX;
-  hi2s2.Init.Standard = I2S_STANDARD_PHILIPS;
-  hi2s2.Init.DataFormat = I2S_DATAFORMAT_16B;
-  hi2s2.Init.MCLKOutput = I2S_MCLKOUTPUT_DISABLE;
-  hi2s2.Init.AudioFreq = I2S_AUDIOFREQ_96K;
-  hi2s2.Init.CPOL = I2S_CPOL_LOW;
-  hi2s2.Init.ClockSource = I2S_CLOCK_PLL;
-  hi2s2.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_ENABLE;
-  if (HAL_I2S_Init(&hi2s2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2S2_Init 2 */
-
-  /* USER CODE END I2S2_Init 2 */
 
 }
 
@@ -422,13 +375,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Audio_RST_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : DATA_Ready_Pin */
-  GPIO_InitStruct.Pin = DATA_Ready_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(DATA_Ready_GPIO_Port, &GPIO_InitStruct);
+                          |Sensor_Supply_Pin|Audio_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CS_I2C_SPI_Pin */
   GPIO_InitStruct.Pin = CS_I2C_SPI_Pin;
@@ -437,12 +384,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(CS_I2C_SPI_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : INT1_Pin INT2_Pin MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = INT1_Pin|INT2_Pin|MEMS_INT2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
-
   /*Configure GPIO pin : OTG_FS_PowerSwitchOn_Pin */
   GPIO_InitStruct.Pin = OTG_FS_PowerSwitchOn_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -450,16 +391,38 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(OTG_FS_PowerSwitchOn_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pin : PDM_OUT_Pin */
+  GPIO_InitStruct.Pin = PDM_OUT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
+  HAL_GPIO_Init(PDM_OUT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : B1_Pin */
+  GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BOOT1_Pin */
+  GPIO_InitStruct.Pin = BOOT1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BOOT1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : CLK_IN_Pin */
+  GPIO_InitStruct.Pin = CLK_IN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
+  HAL_GPIO_Init(CLK_IN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin 
-                           Audio_RST_Pin */
+                           Sensor_Supply_Pin Audio_RST_Pin */
   GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Audio_RST_Pin;
+                          |Sensor_Supply_Pin|Audio_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -470,6 +433,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(OTG_FS_OverCurrent_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = MEMS_INT2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(MEMS_INT2_GPIO_Port, &GPIO_InitStruct);
 
 }
 

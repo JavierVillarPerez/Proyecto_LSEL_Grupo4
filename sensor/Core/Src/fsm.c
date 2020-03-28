@@ -1,3 +1,9 @@
+/*
+ * fsm.c
+ *
+ *  Created on: Mar 28, 2020
+ *      Author: villa
+ */
 
 #include "fsm.h"
 #include <stdlib.h>
@@ -27,4 +33,3 @@ void fsm_fire (fsm_t* this)
     }
   }
 }
-
