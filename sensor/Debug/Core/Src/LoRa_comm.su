@@ -1,0 +1,4 @@
+LoRa_comm.c:30:5:timer_finished	24	static
+LoRa_comm.c:36:6:send_data	48	static
+LoRa_comm.c:50:8:LoRa_initialization	24	static
+LoRa_comm.c:61:6:save_new_data	40	static

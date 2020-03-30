@@ -1,0 +1,17 @@
+fsm_sensor.c:31:5:data_saved	16	static
+fsm_sensor.c:33:5:error	24	static
+fsm_sensor.c:41:5:no_error	24	static
+fsm_sensor.c:49:5:timer_sleep	24	static
+fsm_sensor.c:56:5:timer_setup	24	static
+fsm_sensor.c:62:5:timer_warning	24	static
+fsm_sensor.c:68:5:timer_measure	24	static
+fsm_sensor.c:74:5:contador	24	static
+fsm_sensor.c:82:5:warning_limit	24	static
+fsm_sensor.c:88:6:measuring	32	static
+fsm_sensor.c:102:6:process_data	24	static
+fsm_sensor.c:122:6:alert	24	static
+fsm_sensor.c:129:6:sleep	24	static
+fsm_sensor.c:151:6:setting_up	24	static
+fsm_sensor.c:167:6:save_data	80	static
+fsm_sensor.c:206:6:fsm_sensor_init	16	static
+fsm_sensor.c:212:6:sensor_initialization	24	static
