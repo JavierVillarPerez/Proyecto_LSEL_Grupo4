@@ -26,7 +26,10 @@
 /* USER CODE BEGIN Includes */
 #include "fsm.h"
 #include "fsm_sensor.h"
-
+#include "LoRa_comm.h"
+#include "ring_buf.h"
+#include "fsm.h"
+#include "fsm_sensor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,6 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ID_ph_sensor 1
 #define range_ph_acido 750 	 	// Only for test, real value is 2.
 #define range_ph_basico 800		// Only for test, real value is 5.
 #define range_ph_max 900		// Only for test, real value is 14.
@@ -45,6 +49,8 @@
 #define ph_setup_period 500		// Test time to setting up
 #define ph_average 4			// number of measurements to make for 1 measure.
 
+
+#define LoRa_period 5000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -99,6 +105,7 @@ int main(void)
 //  sensor_t sensor2;
 //  sensor_t sensor3;
 
+  fsm_t* fsm_LoRa;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -126,7 +133,9 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  sensor_initialization(&sensor1, Sensor_Supply_Pin, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_warning_period, ph_sleep_period, ph_measure_period, ph_average);
+  fsm_LoRa = LoRa_initialization(LoRa_period);
+  sensor_initialization(&sensor1, ID_ph_sensor, Sensor_Supply_Pin, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_warning_period, ph_sleep_period, ph_measure_period, ph_average);
+
   fsm_sensor_init(&fsm_s1, &sensor1);
 
   /* USER CODE END 2 */
@@ -139,6 +148,7 @@ int main(void)
     MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
+    fsm_fire(fsm_LoRa);
     fsm_fire(&fsm_s1.fsm);
   }
   /* USER CODE END 3 */

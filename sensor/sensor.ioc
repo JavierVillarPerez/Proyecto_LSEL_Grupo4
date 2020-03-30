@@ -327,7 +327,11 @@ ProjectManager.LastFirmware=true
 ProjectManager.LibraryCopy=1
 ProjectManager.MainLocation=Core/Src
 ProjectManager.NoMain=false
+<<<<<<< HEAD
 ProjectManager.PreviousToolchain=
+=======
+ProjectManager.PreviousToolchain=STM32CubeIDE
+>>>>>>> origin/feature_LoRa_Communication
 ProjectManager.ProjectBuild=false
 ProjectManager.ProjectFileName=sensor.ioc
 ProjectManager.ProjectName=sensor

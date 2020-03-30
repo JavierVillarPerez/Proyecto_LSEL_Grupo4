@@ -8,8 +8,9 @@
 #ifndef INC_FSM_SENSOR_H_
 #define INC_FSM_SENSOR_H_
 
-#include "fsm.h"
+
 #include "main.h"
+#include "fsm.h"
 #include "stm32f4xx_hal_gpio.h"
 //#include "ring_buf.h"
 
@@ -28,6 +29,7 @@ typedef struct {
 	uint8_t measure_count;
 
 	/*SENSOR PARAMS*/
+	uint16_t ID;
 	uint16_t supply_Pin;		//supply´s pin to the sensor
 	uint16_t threshold_L;
 	uint16_t threshold_H;
@@ -46,6 +48,7 @@ typedef struct {
 
 fsm_sensor_t* fsm_sensor_new (sensor_t* param);
 void fsm_sensor_init(fsm_sensor_t* sensor_fsm, sensor_t* param);
+int data_saved(fsm_t* this);
 int error (fsm_t* this);
 int no_error (fsm_t* this);
 int timer_sleep (fsm_t* this);
@@ -59,8 +62,9 @@ void process_data (fsm_t* this);
 void alert (fsm_t* this);
 void sleep (fsm_t* this);
 void setting_up (fsm_t* this);
+void save_data (fsm_t* this);
 
-void sensor_initialization(sensor_t* sensor, uint16_t supply_Pin, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t warning_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average);
+void sensor_initialization(sensor_t* sensor, uint16_t ID, uint16_t supply_Pin, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t warning_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average);
 
 
 #endif /* INC_FSM_SENSOR_H_ */
