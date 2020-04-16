@@ -1,0 +1,2 @@
+freertos.c:61:13:PreSleepProcessing	16	static
+freertos.c:66:13:PostSleepProcessing	16	static

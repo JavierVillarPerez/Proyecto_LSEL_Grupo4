@@ -19,19 +19,19 @@ rbuf_t data_ring_buff;
 long LoRa_timer;
 uint16_t LoRa_period;
 
-enum
-{
-	WAIT,
-}comm_state;
+//enum
+//{
+//	WAIT,
+//}comm_state;
 
 
 
-int timer_finished(fsm_t* this)
-{
-	return(HAL_GetTick() >= +LoRa_timer);
-}
+//int timer_finished(fsm_t* this)
+//{
+//	return(HAL_GetTick() >= +LoRa_timer);
+//}
 
-void send_data(fsm_t* this)
+void send_data(void)
 {
 	 sensor_buf_t data;
 
@@ -43,21 +43,22 @@ void send_data(fsm_t* this)
 	  *
 	  * */
 }
+//
+//fsm_trans_t send_wireless[] = {
+//	  { WAIT, timer_finished, WAIT, send_data},
+//	  {-1, NULL, -1, NULL },
+//};
 
-fsm_trans_t send_wireless[] = {
-	  { WAIT, timer_finished, WAIT, send_data},
-	  {-1, NULL, -1, NULL },
-};
-
-fsm_t* LoRa_initialization(uint16_t period)
+//fsm_t* LoRa_initialization(uint16_t period)
+void LoRa_initialization(void)
 {
-	fsm_t* fsm_LoRa;
+//	fsm_t* fsm_LoRa;
 	ringbuf_init(&data_ring_buff, RBUF_SIZE);
-	fsm_LoRa = fsm_new(send_wireless);
-	LoRa_timer = HAL_GetTick() + period;
-	LoRa_period = period;
+//	fsm_LoRa = fsm_new(send_wireless);
+//	LoRa_timer = HAL_GetTick() + period;
+//	LoRa_period = period;
 
-	return fsm_LoRa;
+//	return fsm_LoRa;
 }
 
 void save_new_data(sensor_buf_t data)

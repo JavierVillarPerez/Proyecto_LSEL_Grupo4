@@ -1,0 +1,3 @@
+fsm.c:11:8:fsm_new	24	static
+fsm.c:18:6:fsm_init	16	static
+fsm.c:24:6:fsm_fire	24	static
