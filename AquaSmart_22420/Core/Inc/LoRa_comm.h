@@ -16,7 +16,7 @@
 
 //fsm_t* LoRa_initialization(uint16_t period);
 void LoRa_initialization(void);
-void send_data(void);
+sensor_buf_t send_data(void);
 void save_new_data(sensor_buf_t data);
 
 

@@ -23,13 +23,13 @@ typedef struct s_date
 
 
 typedef struct device_buf_s{
-	uint16_t ID;
+	uint16_t Device_ID;
+	uint8_t  Sensor_ID;
 	uint16_t measure;
-	t_bool alarm;		// warning signal
-	t_bool error;		// sensor´s error
+	uint8_t alarm;		// warning signal
+	uint8_t error;		// sensor´s error
 	uint16_t threshold_L;
 	uint16_t threshold_H;
-	t_date timestamp;
 }sensor_buf_t;
 
 

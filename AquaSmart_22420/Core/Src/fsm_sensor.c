@@ -19,13 +19,16 @@
 
 ADC_HandleTypeDef hadc1;
 
+long adc_timer;
+
 enum{
+	  Pre_setup,
+	  Setup,
 	  Measure,
 	  Warning,
 	  Process,
 	  Saving,
-	  Sleeping,
-	  Setup
+	  Sleeping
 }sensor_state;
 
 int data_saved(fsm_t* this){ return 1; }
@@ -51,6 +54,10 @@ int timer_sleep (fsm_t* this) {
 	sensor_t* config = punt->param;
 	if(config->active && HAL_GetTick()>=config->sleep_timer) return 1;
 	else return 0;
+}
+
+int timer_adc (fsm_t* this) {
+	return (HAL_GetTick()>adc_timer);
 }
 
 int timer_setup (fsm_t* this) {
@@ -96,34 +103,33 @@ void measuring (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 
+//	if(config->adc_channel == 1)
+//	{
 	data = HAL_ADC_GetValue(&hadc1);
+//	}
+//	else data = HAL_ADC_GetValue(&hadc2);
 
 	config->data_recovered = config->data_recovered + data;
 	config->measure_count = config->measure_count +1;
 	config->measure_timer = HAL_GetTick()+ config->measure_period;
-
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, SET);
 }
 
 void process_data (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
-	config->data_average = config->data_recovered/config->measure_count;
+	config->data_average = config->data_recovered;
+
+//	if(config->adc_channel == 1)
 	HAL_ADC_Stop(&hadc1);
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, 1);
+//	else HAL_ADC_Stop(&hadc2);
 
 	if (config->data_average <= config->threshold_H && config->data_average >= config->threshold_L)
 	{
 		config->alarm = 0;
-		config->alarm = FALSE;
-		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, RESET);
 	}
 	else
 	{
 		config->alarm = 1;
-		config->alarm = TRUE;
-		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, SET);
-
 	}
 
 }
@@ -140,21 +146,26 @@ void sleep (fsm_t* this) { // led orange
 
 	HAL_GPIO_WritePin(GPIOD, config->supply_Pin, RESET);
 
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, RESET);
+	config->sleeping = TRUE;
+	config->measuring = FALSE;
 
 	if(config->warning_count >= 2)
 	{
-		config->error = TRUE;
-		HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, SET);
-		HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, RESET);
+		config->error = 1;
 	}
 	else
 	{
-		config->error = FALSE;
-		HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, SET);
-		HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, RESET);
+		config->error = 0;
 	}
 }
+
+void init_adc (fsm_t* this) {
+	HAL_ADC_Stop(&hadc1);
+
+	adc_timer = HAL_GetTick() + 1000;
+
+}
+
 
 void setting_up (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
@@ -165,11 +176,13 @@ void setting_up (fsm_t* this) {
 	config->data_average = 0;
 	config->setup_timer = HAL_GetTick() + config->setup_period;
 	HAL_GPIO_WritePin(GPIOD, config->supply_Pin, SET);
-	HAL_ADC_Start(&hadc1);
 
-	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, SET);
-	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, RESET);
+	//if (config->adc_channel == 1)
+		HAL_ADC_Start(&hadc1);
+	//else HAL_ADC_Start(&hadc2);
 
+	config->measuring = TRUE;
+	config->sleeping = FALSE;
 }
 
 void save_data (fsm_t* this)
@@ -179,7 +192,8 @@ void save_data (fsm_t* this)
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 
-	data2save.ID = config->ID;
+	data2save.Device_ID = config->Device_ID;
+	data2save.Sensor_ID = config->Sensor_ID;
 	data2save.alarm = config->alarm;
 	data2save.error = config->error;
 	data2save.measure = config->data_average;
@@ -191,10 +205,11 @@ void save_data (fsm_t* this)
 }
 
 fsm_trans_t trans_sensor[] = {
-  { Sleeping, timer_sleep,   Setup,    setting_up},
+  { Sleeping,  timer_sleep,   Pre_setup,  init_adc},
+  { Pre_setup, timer_adc,     Setup,      setting_up},
   { Setup,    timer_setup,   Measure,  measuring},
-  { Measure,  timer_measure, Measure,  measuring},
-  { Measure,  contador,      Process,  process_data},
+  { Measure,  timer_measure, Process,  process_data},
+  //{ Measure,  contador,      Process,  process_data},
   { Process,  error,         Warning,  alert},
   { Process,  no_error,      Saving,   save_data},
   { Warning,  warned, 		 Measure,  measuring},
@@ -217,14 +232,16 @@ void fsm_sensor_init (fsm_sensor_t* f, sensor_t* c) {
 }
 
 
-void sensor_initialization(sensor_t* sensor, uint16_t ID, uint16_t supply_Pin, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average)
+void sensor_initialization(sensor_t* sensor, uint16_t Device_ID, uint8_t Sensor_ID, uint16_t supply_Pin, uint8_t adc_channel, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average)
 {
 	/*SENSOR CONTROL*/
 	sensor->active = TRUE;
 	sensor->data_recovered = 0;
 	sensor->data_average = 0;
-	sensor->alarm = FALSE;
-	sensor->error = FALSE;
+	sensor->alarm = 0;
+	sensor->error = 0;
+	sensor->measuring = FALSE;
+	sensor->sleeping = FALSE;
 	sensor->setup_timer = 0;
 	sensor->sleep_timer = 0;
 	sensor->warning_count = 0;
@@ -232,8 +249,10 @@ void sensor_initialization(sensor_t* sensor, uint16_t ID, uint16_t supply_Pin, u
 	sensor->measure_count = 0;
 
 	/*SENSOR PARAMS*/
-	sensor->ID = ID;
+	sensor->Device_ID = Device_ID;
+	sensor->Sensor_ID = Sensor_ID;
 	sensor->supply_Pin = supply_Pin;
+	sensor->adc_channel = adc_channel;
 	sensor->threshold_L = threshold_L;
 	sensor->threshold_H = threshold_H;
 	sensor->threshold_Max = threshold_Max;

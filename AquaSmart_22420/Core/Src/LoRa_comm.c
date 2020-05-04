@@ -31,7 +31,7 @@ uint16_t LoRa_period;
 //	return(HAL_GetTick() >= +LoRa_timer);
 //}
 
-void send_data(void)
+sensor_buf_t send_data(void)
 {
 	 sensor_buf_t data;
 

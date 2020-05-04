@@ -20,6 +20,8 @@ typedef struct {
 	uint16_t data_average;
 	t_bool alarm;		// warning signal
 	t_bool error;		// sensor´s error
+	t_bool measuring;		// sensor´s error
+	t_bool sleeping;		// sensor´s error
 	long setup_timer;
 	long sleep_timer;
 	long warning_count;
@@ -27,8 +29,10 @@ typedef struct {
 	uint8_t measure_count;
 
 	/*SENSOR PARAMS*/
-	uint16_t ID;
+	uint16_t Device_ID;
+	uint8_t  Sensor_ID;
 	uint16_t supply_Pin;		//supply´s pin to the sensor
+	uint8_t  adc_channel;
 	uint16_t threshold_L;
 	uint16_t threshold_H;
 	uint16_t threshold_Max;	//Max range of data
@@ -61,7 +65,7 @@ void sleep (fsm_t* this);
 void setting_up (fsm_t* this);
 void save_data (fsm_t* this);
 
-void sensor_initialization(sensor_t* sensor, uint16_t ID, uint16_t supply_Pin, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average);
+void sensor_initialization(sensor_t* sensor, uint16_t Device_ID, uint8_t Sensor_ID, uint16_t supply_Pin, uint8_t adc_channel, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average);
 
 
 

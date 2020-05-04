@@ -21,14 +21,15 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "usb_host.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "fsm.h"
 #include "fsm_sensor.h"
 #include "LoRa_comm.h"
-
+#include "ring_buf.h"
+#include "stdio.h"
+#include "SX1278.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,8 +40,20 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define MEASURE_TIME 	 300
+#define SENSOR1_TIME 	 400
+#define SENSOR2_TIME 	 500
+#define LEDS_TIME	 	 300
 #define SEND_DATA_TIME 	 10000
+
+/*ADC channels*/
+#define ADC_Channel1 1
+#define ADC_Channel2 2
+#define ADC_Channel3 3
+#define ADC_Channel4 4
+
+/*PH sensor params*/
+
+#define ID_Device 1
 
 #define ID_ph_sensor 1
 
@@ -50,8 +63,23 @@
 
 #define ph_measure_period 600	// Test time to measure.
 #define ph_sleep_period 5000	// Test time to sleep
-#define ph_setup_period 50		// Test time to setting up
+#define ph_setup_period 1000		// Test time to setting up
 #define ph_average 4			// number of measurements to make for 1 measure.
+
+/*Turbidity sensor params*/
+#define ID_turbidity_sensor 2
+
+#define range_turb_min 750  	 	// Only for test.
+#define range_turb_basico 800		// Only for test.
+#define range_turb_max 900		// Only for test.
+
+#define turb_measure_period 700	// Test time to measure.
+#define turb_sleep_period 5500	// Test time to sleep
+#define turb_setup_period 1000	// Test time to setting up
+#define turb_average 4			// number of measurements to make for 1 measure.
+
+
+#define NUMBER_OF_SENSORS 2
 
 /* USER CODE END PD */
 
@@ -63,11 +91,9 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
-I2C_HandleTypeDef hi2c1;
-
-I2S_HandleTypeDef hi2s3;
-
 SPI_HandleTypeDef hspi1;
+
+PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -76,36 +102,69 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 512 * 4
 };
-/* Definitions for myTaskMeasure */
-osThreadId_t myTaskMeasureHandle;
-const osThreadAttr_t myTaskMeasure_attributes = {
-  .name = "myTaskMeasure",
-  .priority = (osPriority_t) osPriorityLow2,
+/* Definitions for myTaskSensor1 */
+osThreadId_t myTaskSensor1Handle;
+const osThreadAttr_t myTaskSensor1_attributes = {
+  .name = "myTaskSensor1",
+  .priority = (osPriority_t) osPriorityLow4,
   .stack_size = 512 * 4
 };
 /* Definitions for myTaskLoRa */
 osThreadId_t myTaskLoRaHandle;
 const osThreadAttr_t myTaskLoRa_attributes = {
   .name = "myTaskLoRa",
-  .priority = (osPriority_t) osPriorityLow1,
+  .priority = (osPriority_t) osPriorityLow2,
   .stack_size = 512 * 4
 };
+/* Definitions for myTaskSensor2 */
+osThreadId_t myTaskSensor2Handle;
+const osThreadAttr_t myTaskSensor2_attributes = {
+  .name = "myTaskSensor2",
+  .priority = (osPriority_t) osPriorityLow4,
+  .stack_size = 512 * 4
+};
+/* Definitions for myTaskLEDs */
+osThreadId_t myTaskLEDsHandle;
+const osThreadAttr_t myTaskLEDs_attributes = {
+  .name = "myTaskLEDs",
+  .priority = (osPriority_t) osPriorityLow3,
+  .stack_size = 512 * 4
+};
+/* Definitions for myQueueSensor1 */
+osMessageQueueId_t myQueueSensor1Handle;
+const osMessageQueueAttr_t myQueueSensor1_attributes = {
+  .name = "myQueueSensor1"
+};
+/* Definitions for myQueueSensor2 */
+osMessageQueueId_t myQueueSensor2Handle;
+const osMessageQueueAttr_t myQueueSensor2_attributes = {
+  .name = "myQueueSensor2"
+};
 /* USER CODE BEGIN PV */
+
+t_bool sensor1_ON, sensor2_ON;
+SX1278_hw_t SX1278_hw;
+SX1278_t SX1278;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_USB_OTG_FS_PCD_Init(void);
 void StartDefaultTask(void *argument);
-void StartTaskMeasure(void *argument);
+void StartTaskSensor1(void *argument);
 void StartTaskLoRa(void *argument);
+void StartTaskSensor2(void *argument);
+void StartTaskLEDs(void *argument);
 
 /* USER CODE BEGIN PFP */
+int _write(int file, char *ptr, int len);
+void Lora_inicio(int init);
+void Lora_recibe(void);
+void Lora_envia(sensor_buf_t mensaje);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -121,6 +180,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   fsm_sensor_t fsm_s1;
+  fsm_sensor_t fsm_s2;
 
   //fsm_t* fsm_LoRa;
 
@@ -144,10 +204,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
-  MX_I2S3_Init();
   MX_SPI1_Init();
   MX_ADC1_Init();
+  MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -170,6 +229,13 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of myQueueSensor1 */
+  myQueueSensor1Handle = osMessageQueueNew (1, sizeof(sensor_t), &myQueueSensor1_attributes);
+
+  /* creation of myQueueSensor2 */
+  myQueueSensor2Handle = osMessageQueueNew (2, sizeof(sensor_t), &myQueueSensor2_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -178,11 +244,17 @@ int main(void)
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
-  /* creation of myTaskMeasure */
-  myTaskMeasureHandle = osThreadNew(StartTaskMeasure, &fsm_s1, &myTaskMeasure_attributes);
+  /* creation of myTaskSensor1 */
+  myTaskSensor1Handle = osThreadNew(StartTaskSensor1, &fsm_s1, &myTaskSensor1_attributes);
 
   /* creation of myTaskLoRa */
   myTaskLoRaHandle = osThreadNew(StartTaskLoRa, NULL, &myTaskLoRa_attributes);
+
+  /* creation of myTaskSensor2 */
+  myTaskSensor2Handle = osThreadNew(StartTaskSensor2, &fsm_s2, &myTaskSensor2_attributes);
+
+  /* creation of myTaskLEDs */
+  myTaskLEDsHandle = osThreadNew(StartTaskLEDs, NULL, &myTaskLEDs_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -211,7 +283,6 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage 
   */
@@ -220,13 +291,13 @@ void SystemClock_Config(void)
   /** Initializes the CPU, AHB and APB busses clocks 
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 7;
+  RCC_OscInitStruct.PLL.PLLQ = 3;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -237,17 +308,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
-  PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
-  PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -273,7 +337,7 @@ static void MX_ADC1_Init(void)
   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_10B;
   hadc1.Init.ScanConvMode = DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
@@ -304,74 +368,6 @@ static void MX_ADC1_Init(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief I2S3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2S3_Init(void)
-{
-
-  /* USER CODE BEGIN I2S3_Init 0 */
-
-  /* USER CODE END I2S3_Init 0 */
-
-  /* USER CODE BEGIN I2S3_Init 1 */
-
-  /* USER CODE END I2S3_Init 1 */
-  hi2s3.Instance = SPI3;
-  hi2s3.Init.Mode = I2S_MODE_MASTER_TX;
-  hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
-  hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
-  hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
-  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
-  hi2s3.Init.CPOL = I2S_CPOL_LOW;
-  hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
-  hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
-  if (HAL_I2S_Init(&hi2s3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2S3_Init 2 */
-
-  /* USER CODE END I2S3_Init 2 */
-
-}
-
-/**
   * @brief SPI1 Initialization Function
   * @param None
   * @retval None
@@ -394,7 +390,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -406,6 +402,41 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief USB_OTG_FS Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USB_OTG_FS_PCD_Init(void)
+{
+
+  /* USER CODE BEGIN USB_OTG_FS_Init 0 */
+
+  /* USER CODE END USB_OTG_FS_Init 0 */
+
+  /* USER CODE BEGIN USB_OTG_FS_Init 1 */
+
+  /* USER CODE END USB_OTG_FS_Init 1 */
+  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
+  hpcd_USB_OTG_FS.Init.dev_endpoints = 4;
+  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
+  hpcd_USB_OTG_FS.Init.dma_enable = DISABLE;
+  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
+  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
+  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
+  hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
+  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;
+  hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
+  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USB_OTG_FS_Init 2 */
+
+  /* USER CODE END USB_OTG_FS_Init 2 */
 
 }
 
@@ -433,8 +464,14 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(RESET_GPIO_Port, RESET_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Sensor_Supply_Pin|Audio_RST_Pin, GPIO_PIN_RESET);
+                          |Sensor1_Supply_Pin|Audio_RST_Pin|Sensor2_Supply_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CS_I2C_SPI_Pin */
   GPIO_InitStruct.Pin = CS_I2C_SPI_Pin;
@@ -464,11 +501,25 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : BOOT1_Pin */
-  GPIO_InitStruct.Pin = BOOT1_Pin;
+  /*Configure GPIO pin : NSS_Pin */
+  GPIO_InitStruct.Pin = NSS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NSS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DIO0_Pin MODE_Pin */
+  GPIO_InitStruct.Pin = DIO0_Pin|MODE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(BOOT1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RESET_Pin */
+  GPIO_InitStruct.Pin = RESET_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(RESET_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : CLK_IN_Pin */
   GPIO_InitStruct.Pin = CLK_IN_Pin;
@@ -479,19 +530,35 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(CLK_IN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin 
-                           Sensor_Supply_Pin Audio_RST_Pin */
+                           Sensor1_Supply_Pin Audio_RST_Pin Sensor2_Supply_Pin */
   GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Sensor_Supply_Pin|Audio_RST_Pin;
+                          |Sensor1_Supply_Pin|Audio_RST_Pin|Sensor2_Supply_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : I2S3_MCK_Pin I2S3_SCK_Pin I2S3_SD_Pin */
+  GPIO_InitStruct.Pin = I2S3_MCK_Pin|I2S3_SCK_Pin|I2S3_SD_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : OTG_FS_OverCurrent_Pin */
   GPIO_InitStruct.Pin = OTG_FS_OverCurrent_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(OTG_FS_OverCurrent_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Audio_SCL_Pin Audio_SDA_Pin */
+  GPIO_InitStruct.Pin = Audio_SCL_Pin|Audio_SDA_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : MEMS_INT2_Pin */
   GPIO_InitStruct.Pin = MEMS_INT2_Pin;
@@ -502,6 +569,64 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+int _write(int file, char *ptr, int len) {
+	int i;
+	for (i = 0; i < len; i++) {
+		ITM_SendChar(*ptr++);
+	}
+	return len;
+}
+
+
+void Lora_inicio(int init){
+	int ret;
+	//initialize LoRa module
+	SX1278_hw.dio0.port = DIO0_GPIO_Port;
+	SX1278_hw.dio0.pin = DIO0_Pin;
+	SX1278_hw.nss.port = NSS_GPIO_Port;
+	SX1278_hw.nss.pin = NSS_Pin;
+	SX1278_hw.reset.port = RESET_GPIO_Port;
+	SX1278_hw.reset.pin = RESET_Pin;
+	SX1278_hw.spi = &hspi1;
+	SX1278.readBytes=0;
+	SX1278.rxBuffer[0]=0;
+	SX1278.hw = &SX1278_hw;
+
+	printf("Configuring LoRa module\r\n");
+	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
+			SX1278_LORA_BW_20_8KHZ, 10);
+	printf("Done configuring LoRaModule\r\n");
+	while (ret!=1){
+		if (init == 1) {
+			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
+		} else {
+			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
+		}
+		printf("ret: %d\n", ret);
+	}
+}
+
+
+void Lora_envia(sensor_buf_t mensaje){
+	int ret;
+	char buffer[64];
+	int message_length;
+	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d", mensaje.Device_ID, mensaje.Sensor_ID, mensaje.measure, mensaje.alarm, mensaje.error, mensaje.threshold_L, mensaje.threshold_H);
+	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
+	printf("Sending %s\r\n", buffer);
+	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
+}
+
+void Lora_recibe(void){
+	int ret;
+	char buffer[64];
+	ret = SX1278_LoRaRxPacket(&SX1278);
+	if (ret > 0) {
+		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
+		printf("Content (%d): %s\r\n", ret, buffer);
+	}
+}
 
 /* USER CODE END 4 */
 
@@ -514,8 +639,6 @@ static void MX_GPIO_Init(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-  /* init code for USB_HOST */
-  MX_USB_HOST_Init();
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;)
@@ -525,24 +648,24 @@ void StartDefaultTask(void *argument)
   /* USER CODE END 5 */ 
 }
 
-/* USER CODE BEGIN Header_StartTaskMeasure */
+/* USER CODE BEGIN Header_StartTaskSensor1 */
 /**
-* @brief Function implementing the myTaskMeasure thread.
+* @brief Function implementing the myTaskSensor1 thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartTaskMeasure */
-void StartTaskMeasure(void *argument)
+/* USER CODE END Header_StartTaskSensor1 */
+void StartTaskSensor1(void *argument)
 {
-  /* USER CODE BEGIN StartTaskMeasure */
-
+  /* USER CODE BEGIN StartTaskSensor1 */
 	uint32_t tDelay = 0;
 	sensor_t sensor1;
 
+	ADC_ChannelConfTypeDef sConfig = {0};
+
     fsm_sensor_t* fsm_s1 = (fsm_sensor_t*)argument;
 
-    sensor_initialization(&sensor1, ID_ph_sensor, Sensor_Supply_Pin, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
-
+    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, ADC_Channel1, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
     fsm_sensor_init(fsm_s1, &sensor1);
 
     tDelay = osKernelGetTickCount();
@@ -550,13 +673,35 @@ void StartTaskMeasure(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	fsm_fire(&(fsm_s1->fsm));
 
-//	HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
-    tDelay += pdMS_TO_TICKS(MEASURE_TIME);
+	/*Select ADC Channel 1*/
+
+	if(fsm_s1->fsm.current_state <= 4 && sensor2_ON == FALSE)
+	{
+		sensor1_ON = TRUE;
+		sConfig.Channel = ADC_CHANNEL_1;
+		sConfig.Rank = 1;
+		sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+
+		if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+		{
+			Error_Handler();
+		}
+		fsm_fire(&(fsm_s1->fsm));
+		osMessageQueuePut (myQueueSensor1Handle, fsm_s1->param, 0, 0);
+	}
+	else sensor1_ON = FALSE;
+
+	if(fsm_s1->fsm.current_state > 4)
+	{
+		fsm_fire(&(fsm_s1->fsm));
+		osMessageQueuePut (myQueueSensor1Handle, fsm_s1->param, 0, 0);
+	}
+	//	HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
+    tDelay += pdMS_TO_TICKS(SENSOR1_TIME);
     osDelayUntil(tDelay);
   }
-  /* USER CODE END StartTaskMeasure */
+  /* USER CODE END StartTaskSensor1 */
 }
 
 /* USER CODE BEGIN Header_StartTaskLoRa */
@@ -570,19 +715,150 @@ void StartTaskLoRa(void *argument)
 {
   /* USER CODE BEGIN StartTaskLoRa */
   uint32_t tDelay = 0;
-
+  sensor_buf_t data2send;
   tDelay = osKernelGetTickCount();
+  uint8_t master;
+
+  /*master 1 for all devices, 0 for GW*/
+  master = 1;
+
+  Lora_inicio(master);  //0 es esclavo, 1 es maestro
 
   /* Infinite loop */
   for(;;)
   {
 
-    send_data();
-
+	if (master == 1)
+	{
+		for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
+		{
+			data2send = send_data();
+			Lora_envia(data2send);
+		}
+	} else
+	{
+		Lora_recibe();
+	}
 	tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
     osDelayUntil(tDelay);
   }
   /* USER CODE END StartTaskLoRa */
+}
+
+/* USER CODE BEGIN Header_StartTaskSensor2 */
+/**
+* @brief Function implementing the myTaskSensor2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskSensor2 */
+void StartTaskSensor2(void *argument)
+{
+  /* USER CODE BEGIN StartTaskSensor2 */
+	uint32_t tDelay = 0;
+	sensor_t sensor2;
+
+	ADC_ChannelConfTypeDef sConfig = {0};
+
+	fsm_sensor_t* fsm_s2 = (fsm_sensor_t*)argument;
+
+	sensor_initialization(&sensor2, ID_Device, ID_turbidity_sensor, Sensor2_Supply_Pin, ADC_Channel2, range_turb_min, range_turb_basico, range_turb_max, turb_setup_period, turb_sleep_period, turb_measure_period, turb_average);
+	fsm_sensor_init(fsm_s2, &sensor2);
+
+	tDelay = osKernelGetTickCount();
+	/* Infinite loop */
+	/* Infinite loop */
+	for(;;)
+	{
+		/*Select ADC Channel 2*/
+		if(fsm_s2->fsm.current_state <= 4 && sensor1_ON == FALSE)
+		{
+			sensor2_ON = TRUE;
+			sConfig.Channel = ADC_CHANNEL_9;
+			sConfig.Rank = 1;
+			sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+
+			if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+			{
+				Error_Handler();
+			}
+			fsm_fire(&(fsm_s2->fsm));
+			osMessageQueuePut (myQueueSensor2Handle, fsm_s2->param, 0, 0);
+		}
+		else sensor2_ON = FALSE;
+
+		if(fsm_s2->fsm.current_state > 4)
+		{
+			fsm_fire(&(fsm_s2->fsm));
+
+			osMessageQueuePut (myQueueSensor2Handle, fsm_s2->param, 0, 0);
+		}
+
+		tDelay += pdMS_TO_TICKS(SENSOR2_TIME);
+		osDelayUntil(tDelay);
+	}
+  /* USER CODE END StartTaskSensor2 */
+}
+
+/* USER CODE BEGIN Header_StartTaskLEDs */
+/**
+* @brief Function implementing the myTaskLEDs thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskLEDs */
+void StartTaskLEDs(void *argument)
+{
+  /* USER CODE BEGIN StartTaskLEDs */
+	uint32_t tDelay = 0;
+	sensor_t sensor1;
+	sensor_t sensor2;
+
+	tDelay = osKernelGetTickCount();
+
+  /* Infinite loop */
+  for(;;)
+  {
+		osMessageQueueGet (myQueueSensor1Handle, &sensor1, NULL, 0);
+		osMessageQueueGet (myQueueSensor2Handle, &sensor2, NULL, 0);
+
+
+		if(sensor1.measuring == TRUE || sensor2.measuring == TRUE) /*LED BLUE => MEASURING*/
+		{
+			HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, SET);
+			HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, RESET);
+		}
+		else
+		{
+			if(sensor1.sleeping == TRUE && sensor2.sleeping == TRUE)
+			{
+				HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, RESET);
+				if(sensor1.error == TRUE || sensor2.error == TRUE) /*RED LED => SLEEPING SOMETHING WRONG*/
+				{
+					HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, SET);
+					HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, RESET);
+				}
+				else	/*GREEN LED => SLEEPING ALL OK*/
+				{
+					HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, RESET);
+					HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, SET);
+				}
+
+			}
+			else /*STATE UNREACHABLE*/
+			{
+				HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, RESET);
+				HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, RESET);
+			}
+		}
+
+		if(sensor1.alarm == TRUE || sensor2.alarm == TRUE) HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, SET);
+		else HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, RESET);
+
+		tDelay += pdMS_TO_TICKS(SENSOR2_TIME);
+	    osDelayUntil(tDelay);
+  }
+  /* USER CODE END StartTaskLEDs */
 }
 
 /**
