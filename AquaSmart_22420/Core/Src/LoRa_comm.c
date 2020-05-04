@@ -36,12 +36,7 @@ sensor_buf_t send_data(void)
 	 sensor_buf_t data;
 
 	 data = ringbuf_get(&data_ring_buff);
-//	 LoRa_timer = HAL_GetTick() + LoRa_period;
-	 /*
-	  *
-	  * LORA COMM.
-	  *
-	  * */
+	 return data;
 }
 //
 //fsm_trans_t send_wireless[] = {

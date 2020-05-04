@@ -18,8 +18,8 @@ typedef struct {
 	t_bool active;    	//active the sensor
 	uint16_t data_recovered; // recovered data
 	uint16_t data_average;
-	t_bool alarm;		// warning signal
-	t_bool error;		// sensor´s error
+	uint8_t alarm;		// warning signal
+	uint8_t  error;		// sensor´s error
 	t_bool measuring;		// sensor´s error
 	t_bool sleeping;		// sensor´s error
 	long setup_timer;
