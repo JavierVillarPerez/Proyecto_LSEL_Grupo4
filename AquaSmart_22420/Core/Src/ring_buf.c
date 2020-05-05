@@ -4,7 +4,7 @@
 
 #include "ring_buf.h"
 
-#define NEXT(A) (A+1)==(RBUF_SIZE)?0:(A+1) //Si la siguiente posici�n es el tama�o m�ximo del buffer se apunta al primero de nuevo.
+#define NEXT(A) (A+1)==(RBUF_SIZE)?0:A+1 //Si la siguiente posici�n es el tama�o m�ximo del buffer se apunta al primero de nuevo.
 
 
 /*RingBuffer initialization*/

@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-#define RBUF_SIZE 4
+#define RBUF_SIZE 10
 
 typedef struct s_date
 {

@@ -26,7 +26,6 @@
 /* USER CODE BEGIN Includes */
 #include "fsm.h"
 #include "fsm_sensor.h"
-#include "ring_buf.h"
 #include "stdio.h"
 #include "SX1278.h"
 /* USER CODE END Includes */
@@ -39,10 +38,13 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+
+#define PORT 8080
+
 #define SENSOR1_TIME 	 400
 #define SENSOR2_TIME 	 500
 #define LEDS_TIME	 	 300
-#define SEND_DATA_TIME 	 6000
+#define SEND_DATA_TIME 	 10000
 
 
 
@@ -62,7 +64,7 @@
 #define range_ph_max 900		// Only for test, real value is 14.
 
 #define ph_measure_period 600	// Test time to measure.
-#define ph_sleep_period 2000	// Test time to sleep
+#define ph_sleep_period 2500	// Test time to sleep
 #define ph_setup_period 1000		// Test time to setting up
 #define ph_average 4			// number of measurements to make for 1 measure.
 
@@ -74,14 +76,12 @@
 #define range_turb_max 900		// Only for test.
 
 #define turb_measure_period 700	// Test time to measure.
-#define turb_sleep_period 2000	// Test time to sleep
+#define turb_sleep_period 2500	// Test time to sleep
 #define turb_setup_period 1000	// Test time to setting up
 #define turb_average 4			// number of measurements to make for 1 measure.
 
 
 #define NUMBER_OF_SENSORS 2
-
-#define PORT 8080
 
 /* USER CODE END PD */
 
@@ -109,6 +109,13 @@ const osThreadAttr_t myTaskSensor1_attributes = {
   .priority = (osPriority_t) osPriorityLow2,
   .stack_size = 512 * 4
 };
+/* Definitions for myTaskLoRa */
+osThreadId_t myTaskLoRaHandle;
+const osThreadAttr_t myTaskLoRa_attributes = {
+  .name = "myTaskLoRa",
+  .priority = (osPriority_t) osPriorityBelowNormal,
+  .stack_size = 512 * 4
+};
 /* Definitions for myTaskSensor2 */
 osThreadId_t myTaskSensor2Handle;
 const osThreadAttr_t myTaskSensor2_attributes = {
@@ -121,13 +128,6 @@ osThreadId_t myTaskLEDsHandle;
 const osThreadAttr_t myTaskLEDs_attributes = {
   .name = "myTaskLEDs",
   .priority = (osPriority_t) osPriorityLow3,
-  .stack_size = 512 * 4
-};
-/* Definitions for myTaskLoRa */
-osThreadId_t myTaskLoRaHandle;
-const osThreadAttr_t myTaskLoRa_attributes = {
-  .name = "myTaskLoRa",
-  .priority = (osPriority_t) osPriorityBelowNormal,
   .stack_size = 512 * 4
 };
 /* Definitions for myQueueSensor1 */
@@ -148,9 +148,11 @@ const osMessageQueueAttr_t myQueueDataSaved_attributes = {
 /* USER CODE BEGIN PV */
 
 t_bool sensor1_ON, sensor2_ON;
-rbuf_t data_ring_buff;
 SX1278_hw_t SX1278_hw;
 SX1278_t SX1278;
+
+rbuf_t data_ring_buff;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -160,16 +162,15 @@ static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
 void StartDefaultTask(void *argument);
 void StartTaskSensor1(void *argument);
+void StartTaskLoRa(void *argument);
 void StartTaskSensor2(void *argument);
 void StartTaskLEDs(void *argument);
-void StartTaskLoRa(void *argument);
 
 /* USER CODE BEGIN PFP */
-void LoRa_initialization(uint8_t init);
-void send_data(void);
-void receive_data(void);
-void save_new_data(sensor_buf_t data);
-
+int _write(int file, char *ptr, int len);
+void Lora_inicio(int init);
+void Lora_recibe(void);
+void Lora_envia();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -235,7 +236,7 @@ int main(void)
   myQueueSensor1Handle = osMessageQueueNew (1, sizeof(sensor_t), &myQueueSensor1_attributes);
 
   /* creation of myQueueSensor2 */
-  myQueueSensor2Handle = osMessageQueueNew (1, sizeof(sensor_t), &myQueueSensor2_attributes);
+  myQueueSensor2Handle = osMessageQueueNew (2, sizeof(sensor_t), &myQueueSensor2_attributes);
 
   /* creation of myQueueDataSaved */
   myQueueDataSavedHandle = osMessageQueueNew (2, sizeof(t_bool), &myQueueDataSaved_attributes);
@@ -251,14 +252,14 @@ int main(void)
   /* creation of myTaskSensor1 */
   myTaskSensor1Handle = osThreadNew(StartTaskSensor1, &fsm_s1, &myTaskSensor1_attributes);
 
+  /* creation of myTaskLoRa */
+  myTaskLoRaHandle = osThreadNew(StartTaskLoRa, NULL, &myTaskLoRa_attributes);
+
   /* creation of myTaskSensor2 */
   myTaskSensor2Handle = osThreadNew(StartTaskSensor2, &fsm_s2, &myTaskSensor2_attributes);
 
   /* creation of myTaskLEDs */
   myTaskLEDsHandle = osThreadNew(StartTaskLEDs, NULL, &myTaskLEDs_attributes);
-
-  /* creation of myTaskLoRa */
-  myTaskLoRaHandle = osThreadNew(StartTaskLoRa, NULL, &myTaskLoRa_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -552,14 +553,28 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void LoRa_initialization(uint8_t init)
-{
-	uint8_t ret;
 
-	/*Initialize ring buffer*/
+int _write(int file, char *ptr, int len) {
+	int i;
+	for (i = 0; i < len; i++) {
+		ITM_SendChar(*ptr++);
+	}
+	return len;
+}
+
+
+void save_new_data(sensor_buf_t data)
+{
+
+	ringbuf_put(&data_ring_buff, data);
+}
+
+void Lora_inicio(int init){
+	int ret;
+	//initialize LoRa module
+
 	ringbuf_init(&data_ring_buff, RBUF_SIZE);
 
-	//Initialize LoRa module
 	SX1278_hw.dio0.port = DIO0_GPIO_Port;
 	SX1278_hw.dio0.pin = DIO0_Pin;
 	SX1278_hw.nss.port = NSS_GPIO_Port;
@@ -571,52 +586,43 @@ void LoRa_initialization(uint8_t init)
 	SX1278.rxBuffer[0]=0;
 	SX1278.hw = &SX1278_hw;
 
-	//printf("Configuring LoRa module\r\n");
-	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
-			SX1278_LORA_BW_20_8KHZ, 10);
-	//printf("Done configuring LoRaModule\r\n");
-	while (ret!=1){
-		if (init == 1) {
-			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
-		} else {
-			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
-		}
-		//printf("ret: %d\n", ret);
-	}
+//	printf("Configuring LoRa module\r\n");
+//	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
+//			SX1278_LORA_BW_20_8KHZ, 10);
+//	printf("Done configuring LoRaModule\r\n");
+//	while (ret!=1){
+//		if (init == 1) {
+//			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
+//		} else {
+//			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
+//		}
+//		printf("ret: %d\n", ret);
+//	}
 }
 
 
-void send_data(void)
-{
+void Lora_envia(){
+	int ret;
+	char buffer[64];
+	int message_length;
 	sensor_buf_t data;
-	uint8_t ret;
-	char buffer[64];
-	uint8_t message_length;
 
-	data = ringbuf_get(&data_ring_buff); //Take data from ring buffer.
+	data = ringbuf_get(&data_ring_buff);
 
-	/*Send data by LoRa*/
 	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d", data.Device_ID, data.Sensor_ID, data.measure, data.alarm, data.error, data.threshold_L, data.threshold_H);
-	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
-	printf("Sending %s\r\n", buffer);
-	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
+//	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
+//	printf("Sending %s\r\n", buffer);
+//	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
 }
 
-void receive_data(void)
-{
-	uint8_t ret;
+void Lora_recibe(void){
+	int ret;
 	char buffer[64];
-
-	ret = SX1278_LoRaRxPacket(&SX1278);
-	if (ret > 0) {
-		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
-		//printf("Content (%d): %s\r\n", ret, buffer);
-	}
-}
-
-void save_new_data(sensor_buf_t data)
-{
-	ringbuf_put(&data_ring_buff, data);
+//	ret = SX1278_LoRaRxPacket(&SX1278);
+//	if (ret > 0) {
+//		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
+//		printf("Content (%d): %s\r\n", ret, buffer);
+//	}
 }
 
 /* USER CODE END 4 */
@@ -652,6 +658,7 @@ void StartTaskSensor1(void *argument)
 	uint32_t tDelay = 0;
 	sensor_t sensor1;
 	t_bool sensor1_measured = FALSE;
+
 	ADC_ChannelConfTypeDef sConfig = {0};
 
     fsm_sensor_t* fsm_s1 = (fsm_sensor_t*)argument;
@@ -698,6 +705,54 @@ void StartTaskSensor1(void *argument)
   /* USER CODE END StartTaskSensor1 */
 }
 
+/* USER CODE BEGIN Header_StartTaskLoRa */
+/**
+* @brief Function implementing the myTaskLoRa thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskLoRa */
+void StartTaskLoRa(void *argument)
+{
+  /* USER CODE BEGIN StartTaskLoRa */
+  uint32_t tDelay = 0;
+  sensor_buf_t data2send;
+  tDelay = osKernelGetTickCount();
+  uint8_t master;
+  t_bool sensor1_state = FALSE;
+  t_bool sensor2_state = FALSE;
+
+  /*master 1 for all devices, 0 for GW*/
+  master = 1;
+
+  Lora_inicio(master);  //0 es esclavo, 1 es maestro
+
+  /* Infinite loop */
+  for(;;)
+  {
+	  osMessageQueueGet(myQueueDataSavedHandle, &sensor1_state, 0, 0);
+	  osMessageQueueGet(myQueueDataSavedHandle, &sensor2_state, 0, 0);
+
+	if (master == 1)
+	{
+		if(sensor1_state && sensor2_state)
+		{
+			for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
+			{
+				Lora_envia();
+			}
+		}
+	}
+	else
+	{
+		Lora_recibe();
+	}
+	tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
+    osDelayUntil(tDelay);
+  }
+  /* USER CODE END StartTaskLoRa */
+}
+
 /* USER CODE BEGIN Header_StartTaskSensor2 */
 /**
 * @brief Function implementing the myTaskSensor2 thread.
@@ -711,6 +766,7 @@ void StartTaskSensor2(void *argument)
 	uint32_t tDelay = 0;
 	sensor_t sensor2;
 	t_bool sensor2_measured = FALSE;
+
 	ADC_ChannelConfTypeDef sConfig = {0};
 
 	fsm_sensor_t* fsm_s2 = (fsm_sensor_t*)argument;
@@ -720,11 +776,9 @@ void StartTaskSensor2(void *argument)
 
 	tDelay = osKernelGetTickCount();
 	/* Infinite loop */
-	/* Infinite loop */
-	for(;;)
-	{
-		/*Select ADC Channel 2*/
-		if(fsm_s2->fsm.current_state <= 4 && sensor1_ON == FALSE)
+	  for(;;)
+	  {
+		  if(fsm_s2->fsm.current_state <= 4 && sensor1_ON == FALSE)
 		{
 			sensor2_ON = TRUE;
 			sConfig.Channel = ADC_CHANNEL_2;
@@ -750,9 +804,9 @@ void StartTaskSensor2(void *argument)
 			osMessageQueuePut(myQueueDataSavedHandle, (t_bool*) &sensor2_measured, 0, 0);
 		}
 
-		tDelay += pdMS_TO_TICKS(SENSOR2_TIME);
-		osDelayUntil(tDelay);
-	}
+			tDelay += pdMS_TO_TICKS(SENSOR2_TIME);
+			osDelayUntil(tDelay);
+	  }
   /* USER CODE END StartTaskSensor2 */
 }
 
@@ -815,56 +869,6 @@ void StartTaskLEDs(void *argument)
 	    osDelayUntil(tDelay);
   }
   /* USER CODE END StartTaskLEDs */
-}
-
-/* USER CODE BEGIN Header_StartTaskLoRa */
-/**
-* @brief Function implementing the myTaskLoRa thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskLoRa */
-void StartTaskLoRa(void *argument)
-{
-  /* USER CODE BEGIN StartTaskLoRa */
-	  uint32_t tDelay = 0;
-	  tDelay = osKernelGetTickCount();
-	  uint8_t master;
-	  t_bool sensor1_state = FALSE;
-	  t_bool sensor2_state = FALSE;
-
-	  /* master = 0 for slave.
-	   * master = 1 for master.
-	   * master 1 for all devices, 0 for GW*/
-	  master = 1;
-
-	  LoRa_initialization(master);
-
-	  /* Infinite loop */
-	  for(;;)
-	  {
-
-		osMessageQueueGet(myQueueDataSavedHandle, &sensor1_state, 0, 0);
-		osMessageQueueGet(myQueueDataSavedHandle, &sensor2_state, 0, 0);
-
-		if (master == 1)
-		{
-			if(sensor1_state && sensor2_state)
-			{
-				for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
-				{
-					send_data();
-				}
-			}
-		}
-		else
-		{
-			receive_data();
-		}
-		tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
-	    osDelayUntil(tDelay);
-	  }
-  /* USER CODE END StartTaskLoRa */
 }
 
 /**

@@ -10,6 +10,7 @@
 
 #include "main.h"
 #include "fsm.h"
+#include "ring_buf.h"
 #include "stm32f4xx_hal_gpio.h"
 //#include "ring_buf.h"
 
@@ -19,7 +20,7 @@ typedef struct {
 	uint16_t data_recovered; // recovered data
 	uint16_t data_average;
 	uint8_t alarm;		// warning signal
-	uint8_t error;		// sensor´s error
+	uint8_t  error;		// sensor´s error
 	t_bool measuring;		// sensor´s error
 	t_bool sleeping;		// sensor´s error
 	long setup_timer;
@@ -68,6 +69,7 @@ void save_data (fsm_t* this);
 void sensor_initialization(sensor_t* sensor, uint16_t Device_ID, uint8_t Sensor_ID, uint16_t supply_Pin, uint8_t adc_channel, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average);
 
 
+void save_new_data(sensor_buf_t data);
 
 
 #endif /* INC_FSM_SENSOR_H_ */

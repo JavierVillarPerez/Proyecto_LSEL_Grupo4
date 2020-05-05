@@ -14,13 +14,11 @@
  */
 
 #include "fsm_sensor.h"
-#include "ring_buf.h"
 #include "main.h"
-
 
 ADC_HandleTypeDef hadc1;
 
-long adc_timer;
+uint8_t adc_timer;
 
 enum{
 	  Pre_setup,
@@ -58,7 +56,7 @@ int timer_sleep (fsm_t* this) {
 }
 
 int timer_adc (fsm_t* this) {
-	return (HAL_GetTick()>adc_timer);
+	return (HAL_GetTick()>250); /*Timer to ensure ADC setup*/
 }
 
 int timer_setup (fsm_t* this) {
@@ -83,9 +81,11 @@ int contador (fsm_t* this) {
 
 
 int timer_measure (fsm_t* this) {
+	long debug = 0;
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 
+	debug = HAL_GetTick();
 	if(config->measure_count>=(config->measure_average))
 	return 0;
 	else return (HAL_GetTick()>=(config->measure_timer));
@@ -161,7 +161,7 @@ void sleep (fsm_t* this) { // led orange
 void init_adc (fsm_t* this) {
 	HAL_ADC_Stop(&hadc1);
 
-	adc_timer = HAL_GetTick() + 250;	/*Ensure ADC setup*/
+	adc_timer = HAL_GetTick() + 1000;
 
 }
 
