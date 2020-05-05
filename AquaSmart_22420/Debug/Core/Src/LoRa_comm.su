@@ -1,4 +1,0 @@
-LoRa_comm.c:27:6:LoRa_initialization	32	static
-LoRa_comm.c:60:6:send_data	128	static
-LoRa_comm.c:76:6:receive_data	80	static
-LoRa_comm.c:88:6:save_new_data	24	static

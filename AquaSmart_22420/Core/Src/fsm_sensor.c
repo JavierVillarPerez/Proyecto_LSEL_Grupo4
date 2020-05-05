@@ -15,7 +15,8 @@
 
 #include "fsm_sensor.h"
 #include "ring_buf.h"
-#include "LoRa_comm.h"
+#include "main.h"
+
 
 ADC_HandleTypeDef hadc1;
 
@@ -160,7 +161,7 @@ void sleep (fsm_t* this) { // led orange
 void init_adc (fsm_t* this) {
 	HAL_ADC_Stop(&hadc1);
 
-	adc_timer = HAL_GetTick() + 1000;
+	adc_timer = HAL_GetTick() + 250;	/*Ensure ADC setup*/
 
 }
 

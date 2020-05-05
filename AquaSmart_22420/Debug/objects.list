@@ -1,4 +1,3 @@
-"Core/Src/LoRa_comm.o"
 "Core/Src/SX1278.o"
 "Core/Src/freertos.o"
 "Core/Src/fsm.o"

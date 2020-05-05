@@ -48,7 +48,6 @@ typedef enum
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-SPI_HandleTypeDef hspi1;
 
 /* USER CODE END EC */
 

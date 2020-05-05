@@ -26,9 +26,9 @@
 /* USER CODE BEGIN Includes */
 #include "fsm.h"
 #include "fsm_sensor.h"
-#include "LoRa_comm.h"
 #include "ring_buf.h"
-
+#include "stdio.h"
+#include "SX1278.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,7 +42,7 @@
 #define SENSOR1_TIME 	 400
 #define SENSOR2_TIME 	 500
 #define LEDS_TIME	 	 300
-#define SEND_DATA_TIME 	 200
+#define SEND_DATA_TIME 	 6000
 
 
 
@@ -62,7 +62,7 @@
 #define range_ph_max 900		// Only for test, real value is 14.
 
 #define ph_measure_period 600	// Test time to measure.
-#define ph_sleep_period 5000	// Test time to sleep
+#define ph_sleep_period 2000	// Test time to sleep
 #define ph_setup_period 1000		// Test time to setting up
 #define ph_average 4			// number of measurements to make for 1 measure.
 
@@ -74,12 +74,14 @@
 #define range_turb_max 900		// Only for test.
 
 #define turb_measure_period 700	// Test time to measure.
-#define turb_sleep_period 5500	// Test time to sleep
+#define turb_sleep_period 2000	// Test time to sleep
 #define turb_setup_period 1000	// Test time to setting up
 #define turb_average 4			// number of measurements to make for 1 measure.
 
 
 #define NUMBER_OF_SENSORS 2
+
+#define PORT 8080
 
 /* USER CODE END PD */
 
@@ -90,6 +92,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+
+SPI_HandleTypeDef hspi1;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -144,7 +148,9 @@ const osMessageQueueAttr_t myQueueDataSaved_attributes = {
 /* USER CODE BEGIN PV */
 
 t_bool sensor1_ON, sensor2_ON;
-
+rbuf_t data_ring_buff;
+SX1278_hw_t SX1278_hw;
+SX1278_t SX1278;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -159,9 +165,11 @@ void StartTaskLEDs(void *argument);
 void StartTaskLoRa(void *argument);
 
 /* USER CODE BEGIN PFP */
-void Lora_inicio(int init);
-void Lora_recibe(void);
-void Lora_envia(sensor_buf_t mensaje);
+void LoRa_initialization(uint8_t init);
+void send_data(void);
+void receive_data(void);
+void save_new_data(sensor_buf_t data);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -544,8 +552,72 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void LoRa_initialization(uint8_t init)
+{
+	uint8_t ret;
+
+	/*Initialize ring buffer*/
+	ringbuf_init(&data_ring_buff, RBUF_SIZE);
+
+	//Initialize LoRa module
+	SX1278_hw.dio0.port = DIO0_GPIO_Port;
+	SX1278_hw.dio0.pin = DIO0_Pin;
+	SX1278_hw.nss.port = NSS_GPIO_Port;
+	SX1278_hw.nss.pin = NSS_Pin;
+	SX1278_hw.reset.port = RESET_GPIO_Port;
+	SX1278_hw.reset.pin = RESET_Pin;
+	SX1278_hw.spi = &hspi1;
+	SX1278.readBytes=0;
+	SX1278.rxBuffer[0]=0;
+	SX1278.hw = &SX1278_hw;
+
+	//printf("Configuring LoRa module\r\n");
+	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
+			SX1278_LORA_BW_20_8KHZ, 10);
+	//printf("Done configuring LoRaModule\r\n");
+	while (ret!=1){
+		if (init == 1) {
+			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
+		} else {
+			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
+		}
+		//printf("ret: %d\n", ret);
+	}
+}
 
 
+void send_data(void)
+{
+	sensor_buf_t data;
+	uint8_t ret;
+	char buffer[64];
+	uint8_t message_length;
+
+	data = ringbuf_get(&data_ring_buff); //Take data from ring buffer.
+
+	/*Send data by LoRa*/
+	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d", data.Device_ID, data.Sensor_ID, data.measure, data.alarm, data.error, data.threshold_L, data.threshold_H);
+	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
+	printf("Sending %s\r\n", buffer);
+	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
+}
+
+void receive_data(void)
+{
+	uint8_t ret;
+	char buffer[64];
+
+	ret = SX1278_LoRaRxPacket(&SX1278);
+	if (ret > 0) {
+		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
+		//printf("Content (%d): %s\r\n", ret, buffer);
+	}
+}
+
+void save_new_data(sensor_buf_t data)
+{
+	ringbuf_put(&data_ring_buff, data);
+}
 
 /* USER CODE END 4 */
 
@@ -758,8 +830,8 @@ void StartTaskLoRa(void *argument)
 	  uint32_t tDelay = 0;
 	  tDelay = osKernelGetTickCount();
 	  uint8_t master;
-	  t_bool sensor1_state;
-	  t_bool sensor2_state;
+	  t_bool sensor1_state = FALSE;
+	  t_bool sensor2_state = FALSE;
 
 	  /* master = 0 for slave.
 	   * master = 1 for master.
