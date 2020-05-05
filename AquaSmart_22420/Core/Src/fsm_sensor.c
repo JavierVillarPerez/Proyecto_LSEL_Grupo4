@@ -82,11 +82,9 @@ int contador (fsm_t* this) {
 
 
 int timer_measure (fsm_t* this) {
-	long debug = 0;
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 
-	debug = HAL_GetTick();
 	if(config->measure_count>=(config->measure_average))
 	return 0;
 	else return (HAL_GetTick()>=(config->measure_timer));
@@ -205,7 +203,6 @@ void save_data (fsm_t* this)
 }
 
 fsm_trans_t trans_sensor[] = {
-  { Sleeping,  timer_sleep,   Pre_setup,  init_adc},
   { Pre_setup, timer_adc,     Setup,      setting_up},
   { Setup,    timer_setup,   Measure,  measuring},
   { Measure,  timer_measure, Process,  process_data},
@@ -215,6 +212,7 @@ fsm_trans_t trans_sensor[] = {
   { Warning,  warned, 		 Measure,  measuring},
   { Warning,  warning_limit, Saving,   save_data},
   { Saving,   data_saved,    Sleeping, sleep},
+  { Sleeping,  timer_sleep,   Pre_setup,  init_adc},
   {-1, NULL, -1, NULL },
 };
 

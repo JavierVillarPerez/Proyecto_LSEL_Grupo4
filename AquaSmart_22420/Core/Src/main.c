@@ -28,8 +28,7 @@
 #include "fsm_sensor.h"
 #include "LoRa_comm.h"
 #include "ring_buf.h"
-#include "stdio.h"
-#include "SX1278.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -140,11 +139,14 @@ osMessageQueueId_t myQueueSensor2Handle;
 const osMessageQueueAttr_t myQueueSensor2_attributes = {
   .name = "myQueueSensor2"
 };
+/* Definitions for myQueueDataSaved */
+osMessageQueueId_t myQueueDataSavedHandle;
+const osMessageQueueAttr_t myQueueDataSaved_attributes = {
+  .name = "myQueueDataSaved"
+};
 /* USER CODE BEGIN PV */
 
 t_bool sensor1_ON, sensor2_ON;
-SX1278_hw_t SX1278_hw;
-SX1278_t SX1278;
 
 /* USER CODE END PV */
 
@@ -161,7 +163,6 @@ void StartTaskSensor2(void *argument);
 void StartTaskLEDs(void *argument);
 
 /* USER CODE BEGIN PFP */
-int _write(int file, char *ptr, int len);
 void Lora_inicio(int init);
 void Lora_recibe(void);
 void Lora_envia(sensor_buf_t mensaje);
@@ -209,9 +210,6 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
-
-  LoRa_initialization();
-
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -234,7 +232,10 @@ int main(void)
   myQueueSensor1Handle = osMessageQueueNew (1, sizeof(sensor_t), &myQueueSensor1_attributes);
 
   /* creation of myQueueSensor2 */
-  myQueueSensor2Handle = osMessageQueueNew (2, sizeof(sensor_t), &myQueueSensor2_attributes);
+  myQueueSensor2Handle = osMessageQueueNew (1, sizeof(sensor_t), &myQueueSensor2_attributes);
+
+  /* creation of myQueueDataSaved */
+  myQueueDataSavedHandle = osMessageQueueNew (2, sizeof(t_bool), &myQueueDataSaved_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -570,63 +571,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-int _write(int file, char *ptr, int len) {
-	int i;
-	for (i = 0; i < len; i++) {
-		ITM_SendChar(*ptr++);
-	}
-	return len;
-}
 
-
-void Lora_inicio(int init){
-	int ret;
-	//initialize LoRa module
-	SX1278_hw.dio0.port = DIO0_GPIO_Port;
-	SX1278_hw.dio0.pin = DIO0_Pin;
-	SX1278_hw.nss.port = NSS_GPIO_Port;
-	SX1278_hw.nss.pin = NSS_Pin;
-	SX1278_hw.reset.port = RESET_GPIO_Port;
-	SX1278_hw.reset.pin = RESET_Pin;
-	SX1278_hw.spi = &hspi1;
-	SX1278.readBytes=0;
-	SX1278.rxBuffer[0]=0;
-	SX1278.hw = &SX1278_hw;
-
-	printf("Configuring LoRa module\r\n");
-	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
-			SX1278_LORA_BW_20_8KHZ, 10);
-	printf("Done configuring LoRaModule\r\n");
-	while (ret!=1){
-		if (init == 1) {
-			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
-		} else {
-			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
-		}
-		printf("ret: %d\n", ret);
-	}
-}
-
-
-void Lora_envia(sensor_buf_t mensaje){
-	int ret;
-	char buffer[64];
-	int message_length;
-	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d", mensaje.Device_ID, mensaje.Sensor_ID, mensaje.measure, mensaje.alarm, mensaje.error, mensaje.threshold_L, mensaje.threshold_H);
-	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
-	printf("Sending %s\r\n", buffer);
-	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
-}
-
-void Lora_recibe(void){
-	int ret;
-	char buffer[64];
-	ret = SX1278_LoRaRxPacket(&SX1278);
-	if (ret > 0) {
-		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
-		printf("Content (%d): %s\r\n", ret, buffer);
-	}
-}
 
 /* USER CODE END 4 */
 
@@ -660,7 +605,7 @@ void StartTaskSensor1(void *argument)
   /* USER CODE BEGIN StartTaskSensor1 */
 	uint32_t tDelay = 0;
 	sensor_t sensor1;
-
+	t_bool sensor1_measured = FALSE;
 	ADC_ChannelConfTypeDef sConfig = {0};
 
     fsm_sensor_t* fsm_s1 = (fsm_sensor_t*)argument;
@@ -689,13 +634,16 @@ void StartTaskSensor1(void *argument)
 		}
 		fsm_fire(&(fsm_s1->fsm));
 		osMessageQueuePut (myQueueSensor1Handle, fsm_s1->param, 0, 0);
+		osMessageQueuePut(myQueueDataSavedHandle, (t_bool*) &sensor1_measured, 0, 0);
 	}
 	else sensor1_ON = FALSE;
 
 	if(fsm_s1->fsm.current_state > 4)
 	{
+		sensor1_measured = TRUE;
 		fsm_fire(&(fsm_s1->fsm));
 		osMessageQueuePut (myQueueSensor1Handle, fsm_s1->param, 0, 0);
+		osMessageQueuePut(myQueueDataSavedHandle, (t_bool*) &sensor1_measured, 0, 0);
 	}
 	//	HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
     tDelay += pdMS_TO_TICKS(SENSOR1_TIME);
@@ -715,29 +663,38 @@ void StartTaskLoRa(void *argument)
 {
   /* USER CODE BEGIN StartTaskLoRa */
   uint32_t tDelay = 0;
-  sensor_buf_t data2send;
   tDelay = osKernelGetTickCount();
   uint8_t master;
+  t_bool sensor1_state;
+  t_bool sensor2_state;
 
-  /*master 1 for all devices, 0 for GW*/
+  /* master = 0 for slave.
+   * master = 1 for master.
+   * master 1 for all devices, 0 for GW*/
   master = 1;
 
-  Lora_inicio(master);  //0 es esclavo, 1 es maestro
+  LoRa_initialization(master);
 
   /* Infinite loop */
   for(;;)
   {
 
+	osMessageQueueGet(myQueueDataSavedHandle, &sensor1_state, 0, 0);
+	osMessageQueueGet(myQueueDataSavedHandle, &sensor2_state, 0, 0);
+
 	if (master == 1)
 	{
-		for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
+		if(sensor1_state && sensor2_state)
 		{
-			data2send = send_data();
-			Lora_envia(data2send);
+			for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
+			{
+				send_data();
+			}
 		}
-	} else
+	}
+	else
 	{
-		Lora_recibe();
+		receive_data();
 	}
 	tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
     osDelayUntil(tDelay);
@@ -757,7 +714,7 @@ void StartTaskSensor2(void *argument)
   /* USER CODE BEGIN StartTaskSensor2 */
 	uint32_t tDelay = 0;
 	sensor_t sensor2;
-
+	t_bool sensor2_measured = FALSE;
 	ADC_ChannelConfTypeDef sConfig = {0};
 
 	fsm_sensor_t* fsm_s2 = (fsm_sensor_t*)argument;
@@ -774,7 +731,7 @@ void StartTaskSensor2(void *argument)
 		if(fsm_s2->fsm.current_state <= 4 && sensor1_ON == FALSE)
 		{
 			sensor2_ON = TRUE;
-			sConfig.Channel = ADC_CHANNEL_9;
+			sConfig.Channel = ADC_CHANNEL_2;
 			sConfig.Rank = 1;
 			sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
 
@@ -784,14 +741,17 @@ void StartTaskSensor2(void *argument)
 			}
 			fsm_fire(&(fsm_s2->fsm));
 			osMessageQueuePut (myQueueSensor2Handle, fsm_s2->param, 0, 0);
+			osMessageQueuePut(myQueueDataSavedHandle, (t_bool*) &sensor2_measured, 0, 0);
 		}
 		else sensor2_ON = FALSE;
 
 		if(fsm_s2->fsm.current_state > 4)
 		{
+			sensor2_measured = TRUE;
 			fsm_fire(&(fsm_s2->fsm));
 
 			osMessageQueuePut (myQueueSensor2Handle, fsm_s2->param, 0, 0);
+			osMessageQueuePut(myQueueDataSavedHandle, (t_bool*) &sensor2_measured, 0, 0);
 		}
 
 		tDelay += pdMS_TO_TICKS(SENSOR2_TIME);

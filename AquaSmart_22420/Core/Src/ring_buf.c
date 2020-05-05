@@ -4,7 +4,7 @@
 
 #include "ring_buf.h"
 
-#define NEXT(A) (A+1)==(RBUF_SIZE)?0:A+1 //Si la siguiente posici�n es el tama�o m�ximo del buffer se apunta al primero de nuevo.
+#define NEXT(A) (A+1)==(RBUF_SIZE)?0:(A+1) //Si la siguiente posici�n es el tama�o m�ximo del buffer se apunta al primero de nuevo.
 
 
 /*RingBuffer initialization*/
@@ -24,15 +24,23 @@ void ringbuf_init(rbuf_t *_this, int size)
 /*RingBuffer put value*/
 void ringbuf_put(rbuf_t* _this, sensor_buf_t item)
 {
-  if(NEXT(_this->head) != 0){
+  if((NEXT(_this->head) != 0) && (NEXT(_this->head)!= _this->tail)){
   _this->buf[_this->head] = item;
   _this->head++;
   }
   else
   {
-  _this->buf[_this->head] = item;
-  _this->head = 0;
-  _this->tail = RBUF_SIZE - 1; /*Full buffer, reload.*/
+	  _this->buf[_this->head] = item;
+	  if(NEXT(_this->head) == _this->tail)
+	  {
+		  _this->head = _this->tail;
+		  _this->tail = NEXT(_this->tail);
+	  }
+	  else
+	  {
+		  _this->head = 0;
+		  _this->tail = RBUF_SIZE - 1; /*Full buffer, reload.*/
+	  }
   }
 }
 
