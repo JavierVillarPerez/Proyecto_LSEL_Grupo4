@@ -20,9 +20,6 @@ rbuf_t data_ring_buff;
 SX1278_hw_t SX1278_hw;
 SX1278_t SX1278;
 
-SPI_HandleTypeDef hspi1;
-
-
 /*DEBUG FUNCTION*/
 //int _write(int file, char *ptr, int len);
 

@@ -42,7 +42,7 @@
 #define SENSOR1_TIME 	 400
 #define SENSOR2_TIME 	 500
 #define LEDS_TIME	 	 300
-#define SEND_DATA_TIME 	 10000
+#define SEND_DATA_TIME 	 200
 
 
 
@@ -91,8 +91,6 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
-SPI_HandleTypeDef hspi1;
-
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
@@ -104,13 +102,6 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t myTaskSensor1Handle;
 const osThreadAttr_t myTaskSensor1_attributes = {
   .name = "myTaskSensor1",
-  .priority = (osPriority_t) osPriorityLow4,
-  .stack_size = 512 * 4
-};
-/* Definitions for myTaskLoRa */
-osThreadId_t myTaskLoRaHandle;
-const osThreadAttr_t myTaskLoRa_attributes = {
-  .name = "myTaskLoRa",
   .priority = (osPriority_t) osPriorityLow2,
   .stack_size = 512 * 4
 };
@@ -118,7 +109,7 @@ const osThreadAttr_t myTaskLoRa_attributes = {
 osThreadId_t myTaskSensor2Handle;
 const osThreadAttr_t myTaskSensor2_attributes = {
   .name = "myTaskSensor2",
-  .priority = (osPriority_t) osPriorityLow4,
+  .priority = (osPriority_t) osPriorityLow2,
   .stack_size = 512 * 4
 };
 /* Definitions for myTaskLEDs */
@@ -126,6 +117,13 @@ osThreadId_t myTaskLEDsHandle;
 const osThreadAttr_t myTaskLEDs_attributes = {
   .name = "myTaskLEDs",
   .priority = (osPriority_t) osPriorityLow3,
+  .stack_size = 512 * 4
+};
+/* Definitions for myTaskLoRa */
+osThreadId_t myTaskLoRaHandle;
+const osThreadAttr_t myTaskLoRa_attributes = {
+  .name = "myTaskLoRa",
+  .priority = (osPriority_t) osPriorityBelowNormal,
   .stack_size = 512 * 4
 };
 /* Definitions for myQueueSensor1 */
@@ -156,9 +154,9 @@ static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
 void StartDefaultTask(void *argument);
 void StartTaskSensor1(void *argument);
-void StartTaskLoRa(void *argument);
 void StartTaskSensor2(void *argument);
 void StartTaskLEDs(void *argument);
+void StartTaskLoRa(void *argument);
 
 /* USER CODE BEGIN PFP */
 void Lora_inicio(int init);
@@ -245,14 +243,14 @@ int main(void)
   /* creation of myTaskSensor1 */
   myTaskSensor1Handle = osThreadNew(StartTaskSensor1, &fsm_s1, &myTaskSensor1_attributes);
 
-  /* creation of myTaskLoRa */
-  myTaskLoRaHandle = osThreadNew(StartTaskLoRa, NULL, &myTaskLoRa_attributes);
-
   /* creation of myTaskSensor2 */
   myTaskSensor2Handle = osThreadNew(StartTaskSensor2, &fsm_s2, &myTaskSensor2_attributes);
 
   /* creation of myTaskLEDs */
   myTaskLEDsHandle = osThreadNew(StartTaskLEDs, NULL, &myTaskLEDs_attributes);
+
+  /* creation of myTaskLoRa */
+  myTaskLoRaHandle = osThreadNew(StartTaskLoRa, NULL, &myTaskLoRa_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -628,56 +626,6 @@ void StartTaskSensor1(void *argument)
   /* USER CODE END StartTaskSensor1 */
 }
 
-/* USER CODE BEGIN Header_StartTaskLoRa */
-/**
-* @brief Function implementing the myTaskLoRa thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskLoRa */
-void StartTaskLoRa(void *argument)
-{
-  /* USER CODE BEGIN StartTaskLoRa */
-  uint32_t tDelay = 0;
-  tDelay = osKernelGetTickCount();
-  uint8_t master;
-  t_bool sensor1_state;
-  t_bool sensor2_state;
-
-  /* master = 0 for slave.
-   * master = 1 for master.
-   * master 1 for all devices, 0 for GW*/
-  master = 1;
-
-  LoRa_initialization(master);
-
-  /* Infinite loop */
-  for(;;)
-  {
-
-	osMessageQueueGet(myQueueDataSavedHandle, &sensor1_state, 0, 0);
-	osMessageQueueGet(myQueueDataSavedHandle, &sensor2_state, 0, 0);
-
-	if (master == 1)
-	{
-		if(sensor1_state && sensor2_state)
-		{
-			for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
-			{
-				send_data();
-			}
-		}
-	}
-	else
-	{
-		receive_data();
-	}
-	tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
-    osDelayUntil(tDelay);
-  }
-  /* USER CODE END StartTaskLoRa */
-}
-
 /* USER CODE BEGIN Header_StartTaskSensor2 */
 /**
 * @brief Function implementing the myTaskSensor2 thread.
@@ -795,6 +743,56 @@ void StartTaskLEDs(void *argument)
 	    osDelayUntil(tDelay);
   }
   /* USER CODE END StartTaskLEDs */
+}
+
+/* USER CODE BEGIN Header_StartTaskLoRa */
+/**
+* @brief Function implementing the myTaskLoRa thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskLoRa */
+void StartTaskLoRa(void *argument)
+{
+  /* USER CODE BEGIN StartTaskLoRa */
+	  uint32_t tDelay = 0;
+	  tDelay = osKernelGetTickCount();
+	  uint8_t master;
+	  t_bool sensor1_state;
+	  t_bool sensor2_state;
+
+	  /* master = 0 for slave.
+	   * master = 1 for master.
+	   * master 1 for all devices, 0 for GW*/
+	  master = 1;
+
+	  LoRa_initialization(master);
+
+	  /* Infinite loop */
+	  for(;;)
+	  {
+
+		osMessageQueueGet(myQueueDataSavedHandle, &sensor1_state, 0, 0);
+		osMessageQueueGet(myQueueDataSavedHandle, &sensor2_state, 0, 0);
+
+		if (master == 1)
+		{
+			if(sensor1_state && sensor2_state)
+			{
+				for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
+				{
+					send_data();
+				}
+			}
+		}
+		else
+		{
+			receive_data();
+		}
+		tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
+	    osDelayUntil(tDelay);
+	  }
+  /* USER CODE END StartTaskLoRa */
 }
 
 /**
