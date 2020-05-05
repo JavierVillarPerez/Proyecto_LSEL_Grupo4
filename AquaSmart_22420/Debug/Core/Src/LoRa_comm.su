@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 core_cm4.h:2064:26:ITM_SendChar	16	static,ignoring_inline_asm
 LoRa_comm.c:27:5:_write	32	static
 LoRa_comm.c:36:6:LoRa_initialization	32	static
 LoRa_comm.c:69:6:send_data	128	static
 LoRa_comm.c:85:6:receive_data	80	static
 LoRa_comm.c:97:6:save_new_data	24	static
+=======
+LoRa_comm.c:34:14:send_data	40	static
+LoRa_comm.c:48:6:LoRa_initialization	8	static
+LoRa_comm.c:59:6:save_new_data	24	static
+>>>>>>> 085c7b6aea126d471a715306602697e948bd49b1
