@@ -1,2 +1,7 @@
-freertos.c:61:13:PreSleepProcessing	16	static
-freertos.c:66:13:PostSleepProcessing	16	static
+freertos.c:123:13:PreSleepProcessing	16	static
+freertos.c:128:13:PostSleepProcessing	16	static
+freertos.c:139:6:MX_FREERTOS_Init	32	static
+freertos.c:200:6:StartDefaultTask	16	static
+freertos.c:218:6:StartTaskSensor1	112	static
+freertos.c:270:6:StartTaskLoRa	40	static
+freertos.c:368:6:StartTaskLEDs	128	static

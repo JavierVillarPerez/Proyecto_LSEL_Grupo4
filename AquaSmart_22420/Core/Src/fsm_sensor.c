@@ -15,8 +15,7 @@
 
 #include "fsm_sensor.h"
 #include "main.h"
-
-ADC_HandleTypeDef hadc1;
+#include "adc.h"
 
 uint8_t adc_timer;
 
