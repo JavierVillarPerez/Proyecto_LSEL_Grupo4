@@ -8,6 +8,10 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
+-include USB_DEVICE/Target/subdir.mk
+-include USB_DEVICE/App/subdir.mk
+-include Middlewares/ST/STM32_USB_Device_Library/Core/Src/subdir.mk
+-include Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/subdir.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
@@ -40,8 +44,8 @@ LSEL_LORA.bin \
 all: LSEL_LORA.elf secondary-outputs
 
 # Tool invocations
-LSEL_LORA.elf: $(OBJS) $(USER_OBJS) C:\Users\Guillermo\STM32CubeIDE\LSEL_LORA\STM32F411VETX_FLASH.ld
-	arm-none-eabi-gcc -o "LSEL_LORA.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Guillermo\STM32CubeIDE\LSEL_LORA\STM32F411VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LSEL_LORA.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+LSEL_LORA.elf: $(OBJS) $(USER_OBJS) D:\Usuarios\Documents\Universidad\LSEL\Proyecto_AquaSmart\Proyecto_LSEL_Grupo4\LSEL_LORA\STM32F411VETX_FLASH.ld
+	arm-none-eabi-gcc -o "LSEL_LORA.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Usuarios\Documents\Universidad\LSEL\Proyecto_AquaSmart\Proyecto_LSEL_Grupo4\LSEL_LORA\STM32F411VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LSEL_LORA.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
