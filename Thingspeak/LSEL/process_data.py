@@ -29,6 +29,14 @@ def process_d(data):
     fmt_size = struct.calcsize("HH??HHiiiii")
     x.ID, x.measure, x.alarm, x.error, x.threshold_L, x.threshold_H, x.year, x.month, x.day, x.hour, x.minutes = struct.unpack("HH??HHiiiii", data[:fmt_size])
     update_channel(x.ID, channel_id, write_key, x.measure)
+    fuente = 1
+
+    if x.threshold_H > x.measure > x.threshold_L:
+        potable = 1
+    else:
+        potable = 0
+
+    return fuente, potable
 
 
 def update_channel(id_sensor, id_channel, api_key_channel, measure):
