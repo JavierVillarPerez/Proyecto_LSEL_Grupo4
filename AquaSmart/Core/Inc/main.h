@@ -93,48 +93,6 @@ void Lora_envia(void);
 #define Sensor2_Supply_GPIO_Port GPIOD
 /* USER CODE BEGIN Private defines */
 
-#define PORT 8080
-
-#define SENSOR1_TIME 	 400
-#define SENSOR2_TIME 	 500
-#define LEDS_TIME	 	 300
-#define SEND_DATA_TIME 	 10000
-
-
-
-#define ADC_Channel1 1
-#define ADC_Channel2 2
-#define ADC_Channel3 3
-#define ADC_Channel4 4
-
-
-#define ID_Device 1
-
-#define ID_ph_sensor 1
-
-#define range_ph_acido 750 	 	// Only for test, real value is 2.
-#define range_ph_basico 800		// Only for test, real value is 5.
-#define range_ph_max 900		// Only for test, real value is 14.
-
-#define ph_measure_period 600	// Test time to measure.
-#define ph_sleep_period 2500	// Test time to sleep
-#define ph_setup_period 1000		// Test time to setting up
-#define ph_average 4			// number of measurements to make for 1 measure.
-
-/*Turbidity sensor params*/
-#define ID_turbidity_sensor 2
-
-#define range_turb_min 750  	 	// Only for test.
-#define range_turb_basico 800		// Only for test.
-#define range_turb_max 900		// Only for test.
-
-#define turb_measure_period 700	// Test time to measure.
-#define turb_sleep_period 2500	// Test time to sleep
-#define turb_setup_period 1000	// Test time to setting up
-#define turb_average 4			// number of measurements to make for 1 measure.
-
-
-#define NUMBER_OF_SENSORS 2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

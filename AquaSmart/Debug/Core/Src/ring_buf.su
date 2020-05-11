@@ -1,3 +1,0 @@
-ring_buf.c:11:6:ringbuf_init	24	static
-ring_buf.c:25:6:ringbuf_put	24	static
-ring_buf.c:56:14:ringbuf_get	32	static
