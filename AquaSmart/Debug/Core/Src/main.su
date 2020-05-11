@@ -1,0 +1,14 @@
+core_cm4.h:2064:26:ITM_SendChar	16	static,ignoring_inline_asm
+main.c:176:5:main	32	static
+main.c:260:6:SystemClock_Config	88	static
+main.c:300:5:_write	32	static
+main.c:315:6:StartDefaultTask	16	static
+main.c:335:6:StartTaskSensor1	128	static
+main.c:396:6:StartTaskLoRa	24	static
+main.c:445:6:StartTaskSensor2	128	static
+main.c:504:6:StartTaskLEDs	128	static
+main.c:558:6:save_new_data	24	static
+main.c:564:6:Lora_inicio	32	static
+main.c:591:6:Lora_recibe	80	static
+main.c:600:6:Lora_envia	136	static
+main.c:619:6:Error_Handler	4	static

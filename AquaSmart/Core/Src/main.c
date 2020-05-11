@@ -65,8 +65,8 @@
 #define range_ph_max 900		// Only for test, real value is 14.
 
 #define ph_measure_period 600	// Test time to measure.
-#define ph_sleep_period 2500	// Test time to sleep
-#define ph_setup_period 1000		// Test time to setting up
+#define ph_sleep_period 1500	// Test time to sleep
+#define ph_setup_period 500		// Test time to setting up
 #define ph_average 4			// number of measurements to make for 1 measure.
 
 /*Turbidity sensor params*/
@@ -77,8 +77,8 @@
 #define range_turb_max 900		// Only for test.
 
 #define turb_measure_period 700	// Test time to measure.
-#define turb_sleep_period 2500	// Test time to sleep
-#define turb_setup_period 1000	// Test time to setting up
+#define turb_sleep_period 1500	// Test time to sleep
+#define turb_setup_period 500	// Test time to setting up
 #define turb_average 4			// number of measurements to make for 1 measure.
 
 
@@ -297,6 +297,13 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+int _write(int file, char *ptr, int len) {
+	int i;
+	for (i = 0; i < len; i++) {
+		ITM_SendChar(*ptr++);
+	}
+	return len;
+}
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
@@ -568,17 +575,17 @@ void Lora_inicio(int init){
 	SX1278.rxBuffer[0]=0;
 	SX1278.hw = &SX1278_hw;
 
-	//printf("Configuring LoRa module\r\n");
+	printf("Configuring LoRa module\r\n");
 	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
 			SX1278_LORA_BW_20_8KHZ, 10);
-	//printf("Done configuring LoRaModule\r\n");
+	printf("Done configuring LoRaModule\r\n");
 	while (ret!=1){
 		if (init == 1) {
 			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
 		} else {
 			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
 		}
-		//printf("ret: %d\n", ret);
+		printf("ret: %d\n", ret);
 	}
 }
 void Lora_recibe(void){
@@ -587,7 +594,7 @@ void Lora_recibe(void){
 	ret = SX1278_LoRaRxPacket(&SX1278);
 	if (ret > 0) {
 		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
-		//printf("Content (%d): %s\r\n", ret, buffer);
+		printf("Content (%d): %s\r\n", ret, buffer);
 	}
 }
 void Lora_envia(void){
@@ -600,7 +607,7 @@ void Lora_envia(void){
 
 	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d", data.Device_ID, data.Sensor_ID, data.measure, data.alarm, data.error, data.threshold_L, data.threshold_H);
 	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
-	//printf("Sending %s\r\n", buffer);
+	printf("Sending %s\r\n", buffer);
 	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
 }
 /* USER CODE END 4 */
