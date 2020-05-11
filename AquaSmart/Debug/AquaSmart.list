@@ -4232,9 +4232,9 @@ void ringbuf_put(rbuf_t* _this, sensor_buf_t item)
  8001d0a:	68fb      	ldr	r3, [r7, #12]
  8001d0c:	2200      	movs	r2, #0
  8001d0e:	679a      	str	r2, [r3, #120]	; 0x78
-		  _this->tail = RBUF_SIZE - 1; /*Full buffer, reload.*/
+		  _this->tail = RBUF_SIZE - 2; /*Full buffer, reload.*/
  8001d10:	68fb      	ldr	r3, [r7, #12]
- 8001d12:	2209      	movs	r2, #9
+ 8001d12:	2208      	movs	r2, #8
  8001d14:	67da      	str	r2, [r3, #124]	; 0x7c
 	  }
   }
