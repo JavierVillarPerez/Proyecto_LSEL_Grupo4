@@ -1,0 +1,6 @@
+freertos.c:123:6:MX_FREERTOS_Init	32	static
+freertos.c:184:6:StartDefaultTask	16	static
+freertos.c:202:6:StartTaskSensor1	112	static
+freertos.c:249:6:StartTaskSensor2	112	static
+freertos.c:298:6:StartTaskLoRa	24	static
+freertos.c:346:6:StartTaskLEDs	128	static
