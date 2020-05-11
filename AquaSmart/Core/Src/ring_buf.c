@@ -39,7 +39,7 @@ void ringbuf_put(rbuf_t* _this, sensor_buf_t item)
 	  else
 	  {
 		  _this->head = 0;
-		  _this->tail = RBUF_SIZE - 1; /*Full buffer, reload.*/
+		  _this->tail = RBUF_SIZE - 2; /*Full buffer, reload.*/
 	  }
   }
 }

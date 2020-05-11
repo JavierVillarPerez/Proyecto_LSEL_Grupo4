@@ -47,7 +47,7 @@
 #define SENSOR1_TIME 	 400
 #define SENSOR2_TIME 	 500
 #define LEDS_TIME	 	 300
-#define SEND_DATA_TIME	 6000
+#define SEND_DATA_TIME	 10000
 
 
 #define ADC_Channel1 1
@@ -296,14 +296,6 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-int _write(int file, char *ptr, int len) {
-	int i;
-	for (i = 0; i < len; i++) {
-		ITM_SendChar(*ptr++);
-	}
-	return len;
-}
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
@@ -575,17 +567,14 @@ void Lora_inicio(int init){
 	SX1278.rxBuffer[0]=0;
 	SX1278.hw = &SX1278_hw;
 
-	printf("Configuring LoRa module\r\n");
 	SX1278_begin(&SX1278, SX1278_433MHZ, SX1278_POWER_17DBM, SX1278_LORA_SF_8,
 			SX1278_LORA_BW_20_8KHZ, 10);
-	printf("Done configuring LoRaModule\r\n");
 	while (ret!=1){
 		if (init == 1) {
 			ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
 		} else {
 			ret = SX1278_LoRaEntryRx(&SX1278, 16, 2000); //tiene que valer 1
 		}
-		printf("ret: %d\n", ret);
 	}
 }
 void Lora_recibe(void){
@@ -594,7 +583,6 @@ void Lora_recibe(void){
 	ret = SX1278_LoRaRxPacket(&SX1278);
 	if (ret > 0) {
 		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
-		printf("Content (%d): %s\r\n", ret, buffer);
 	}
 }
 void Lora_envia(void){
@@ -605,9 +593,8 @@ void Lora_envia(void){
 
 	data = ringbuf_get(&data_ring_buff);
 
-	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d", data.Device_ID, data.Sensor_ID, data.measure, data.alarm, data.error, data.threshold_L, data.threshold_H);
+	message_length = sprintf(buffer, "AquaSmart %d %d %d %d %d %d %d\n", data.Device_ID, data.Sensor_ID, data.measure, data.alarm, data.error, data.threshold_L, data.threshold_H);
 	ret = SX1278_LoRaEntryTx(&SX1278, message_length, 2000);
-	printf("Sending %s\r\n", buffer);
 	ret = SX1278_LoRaTxPacket(&SX1278, (uint8_t *) buffer, message_length, 2000);
 }
 /* USER CODE END 4 */
