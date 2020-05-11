@@ -76,8 +76,6 @@ void Lora_envia(sensor_buf_t prueba);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	uint8_t buffer[] = "Hello world!\r\n";
-	uint8_t len = 0;
 	sensor_buf_t prueba;
 
   /* USER CODE END 1 */
@@ -103,7 +101,6 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  len = strlen((char*) buffer);
 
   Lora_inicio(master);  //0 es esclavo, 1 es maestro
 
@@ -131,7 +128,6 @@ int main(void)
 	} else {
 		Lora_recibe();
 	}
-	  CDC_Transmit_FS(buffer, len);
 	  HAL_Delay(1000);
   }
   /* USER CODE END 3 */
@@ -218,11 +214,18 @@ void Lora_inicio(int init){
 void Lora_recibe(void){
 	int ret;
 	char buffer[64];
+	uint8_t len = 0;
+
+
 	ret = SX1278_LoRaRxPacket(&SX1278);
 	if (ret > 0) {
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
 		printf("Content (%d): %s\r\n", ret, buffer);
+
+		//SEND THROGH USB
+		len = strlen((char*) buffer);
+		CDC_Transmit_FS(buffer, len);
 	}
 }
 void Lora_envia(sensor_buf_t prueba){
