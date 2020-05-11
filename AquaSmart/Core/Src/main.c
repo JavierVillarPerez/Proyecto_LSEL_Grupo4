@@ -47,7 +47,7 @@
 #define SENSOR1_TIME 	 400
 #define SENSOR2_TIME 	 500
 #define LEDS_TIME	 	 300
-#define SEND_DATA_TIME	 6000
+#define SEND_DATA_TIME	 10000
 
 
 #define ADC_Channel1 1
