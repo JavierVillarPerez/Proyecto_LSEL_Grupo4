@@ -39,11 +39,11 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING
  17 .debug_line   00010018  00000000  00000000  00058a30  2**0
                   CONTENTS, READONLY, DEBUGGING
- 18 .debug_str    00094b33  00000000  00000000  00068a48  2**0
+ 18 .debug_str    00094b1c  00000000  00000000  00068a48  2**0
                   CONTENTS, READONLY, DEBUGGING
- 19 .comment      0000007b  00000000  00000000  000fd57b  2**0
+ 19 .comment      0000007b  00000000  00000000  000fd564  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  00004714  00000000  00000000  000fd5f8  2**2
+ 20 .debug_frame  00004714  00000000  00000000  000fd5e0  2**2
                   CONTENTS, READONLY, DEBUGGING
 
 Disassembly of section .text:
@@ -3297,7 +3297,7 @@ void StartTaskSensor1(void *argument)
  80016f6:	687b      	ldr	r3, [r7, #4]
  80016f8:	653b      	str	r3, [r7, #80]	; 0x50
 
-    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, ADC_Channel1, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
+    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, ADC_Channel1, range_ph_basico, range_ph_acido, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
  80016fa:	f107 001c 	add.w	r0, r7, #28
  80016fe:	2304      	movs	r3, #4
  8001700:	9307      	str	r3, [sp, #28]
@@ -3309,9 +3309,9 @@ void StartTaskSensor1(void *argument)
  8001712:	9304      	str	r3, [sp, #16]
  8001714:	f44f 7361 	mov.w	r3, #900	; 0x384
  8001718:	9303      	str	r3, [sp, #12]
- 800171a:	f44f 7348 	mov.w	r3, #800	; 0x320
+ 800171a:	f44f 732f 	mov.w	r3, #700	; 0x2bc
  800171e:	9302      	str	r3, [sp, #8]
- 8001720:	f240 23ee 	movw	r3, #750	; 0x2ee
+ 8001720:	f44f 7316 	mov.w	r3, #600	; 0x258
  8001724:	9301      	str	r3, [sp, #4]
  8001726:	2301      	movs	r3, #1
  8001728:	9300      	str	r3, [sp, #0]
@@ -3536,7 +3536,7 @@ void StartTaskLoRa(void *argument)
 	}
 	tDelay += pdMS_TO_TICKS(SEND_DATA_TIME);
  800187c:	68fb      	ldr	r3, [r7, #12]
- 800187e:	f503 53bb 	add.w	r3, r3, #5984	; 0x1760
+ 800187e:	f503 531c 	add.w	r3, r3, #9984	; 0x2700
  8001882:	3310      	adds	r3, #16
  8001884:	60fb      	str	r3, [r7, #12]
 	osDelayUntil(tDelay);
@@ -3589,11 +3589,11 @@ void StartTaskSensor2(void *argument)
  80018c8:	9305      	str	r3, [sp, #20]
  80018ca:	f44f 73fa 	mov.w	r3, #500	; 0x1f4
  80018ce:	9304      	str	r3, [sp, #16]
- 80018d0:	f44f 7361 	mov.w	r3, #900	; 0x384
+ 80018d0:	f44f 7348 	mov.w	r3, #800	; 0x320
  80018d4:	9303      	str	r3, [sp, #12]
  80018d6:	f44f 7348 	mov.w	r3, #800	; 0x320
  80018da:	9302      	str	r3, [sp, #8]
- 80018dc:	f240 23ee 	movw	r3, #750	; 0x2ee
+ 80018dc:	f44f 7316 	mov.w	r3, #600	; 0x258
  80018e0:	9301      	str	r3, [sp, #4]
  80018e2:	2302      	movs	r3, #2
  80018e4:	9300      	str	r3, [sp, #0]

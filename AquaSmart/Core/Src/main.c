@@ -60,8 +60,8 @@
 
 #define ID_ph_sensor 1
 
-#define range_ph_acido 750 	 	// Only for test, real value is 2.
-#define range_ph_basico 800		// Only for test, real value is 5.
+#define range_ph_basico 600 	 	// Only for test, real value is 2.
+#define range_ph_acido 700		// Only for test, real value is 5.
 #define range_ph_max 900		// Only for test, real value is 14.
 
 #define ph_measure_period 600	// Test time to measure.
@@ -72,9 +72,9 @@
 /*Turbidity sensor params*/
 #define ID_turbidity_sensor 2
 
-#define range_turb_min 750  	 	// Only for test.
+#define range_turb_min 600  	 	// Only for test.
 #define range_turb_basico 800		// Only for test.
-#define range_turb_max 900		// Only for test.
+#define range_turb_max 800			// Only for test.
 
 #define turb_measure_period 700	// Test time to measure.
 #define turb_sleep_period 1500	// Test time to sleep
@@ -335,7 +335,7 @@ void StartTaskSensor1(void *argument)
 
     fsm_sensor_t* fsm_s1 = (fsm_sensor_t*)argument;
 
-    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, ADC_Channel1, range_ph_acido, range_ph_basico, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
+    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, ADC_Channel1, range_ph_basico, range_ph_acido, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
     fsm_sensor_init(fsm_s1, &sensor1);
 
     tDelay = osKernelGetTickCount();
