@@ -1,23 +1,23 @@
 /*
  * fsm_sensor.c
  *
- *  Created on: Mar 28, 2020
- *      Author: villa
- */
-
-
-/*
- * fsm_sensor.c
+ * Description: FSM for sensor control.
+ * 				This FSM has been created in order to take measurements
+ * 				from the ADC for different sensors with different
+ * 				configurations.
  *
  *  Created on: 9 mar. 2020
- *      Author: villa
+ *      Author: Javier Villar
  */
 
 #include "fsm_sensor.h"
 #include "main.h"
 #include "adc.h"
 
+#define adc_setup_time 250 /*Time to ensure ADC switched on*/
+
 uint8_t adc_timer;
+t_bool  data_saved_flg;
 
 enum{
 	  Pre_setup,
@@ -29,7 +29,10 @@ enum{
 	  Sleeping
 }sensor_state;
 
-int data_saved(fsm_t* this){ return 1; }
+int data_saved(fsm_t* this)
+{
+	return data_saved_flg;
+}
 
 int error (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
@@ -70,11 +73,11 @@ int warned (fsm_t* this) {
 	return (config->warning_count < 2);
 }
 
-int contador (fsm_t* this) {
+int average_counter (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 	if(config->measure_count>=(config->measure_average))
-		return 1;
+	return 1;
 	else return 0;
 }
 
@@ -83,9 +86,7 @@ int timer_measure (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 
-	if(config->measure_count>=(config->measure_average))
-	return 0;
-	else return (HAL_GetTick()>=(config->measure_timer));
+	return (HAL_GetTick()>=(config->measure_timer));
 }
 
 int warning_limit (fsm_t* this) {
@@ -99,11 +100,7 @@ void measuring (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
 
-//	if(config->adc_channel == 1)
-//	{
 	data = HAL_ADC_GetValue(&hadc1);
-//	}
-//	else data = HAL_ADC_GetValue(&hadc2);
 
 	config->data_recovered = config->data_recovered + data;
 	config->measure_count = config->measure_count +1;
@@ -113,11 +110,11 @@ void measuring (fsm_t* this) {
 void process_data (fsm_t* this) {
 	fsm_sensor_t* punt = (fsm_sensor_t*) this;
 	sensor_t* config = punt->param;
-	config->data_average = config->data_recovered;
+	config->data_average = config->data_recovered/config->measure_average;
+	config->measure_count = 0;
+	config->data_recovered = 0;
 
-//	if(config->adc_channel == 1)
 	HAL_ADC_Stop(&hadc1);
-//	else HAL_ADC_Stop(&hadc2);
 
 	if (config->data_average <= config->threshold_H && config->data_average >= config->threshold_L)
 	{
@@ -145,6 +142,8 @@ void sleep (fsm_t* this) { // led orange
 	config->sleeping = TRUE;
 	config->measuring = FALSE;
 
+	data_saved_flg = FALSE;
+
 	if(config->warning_count >= 2)
 	{
 		config->error = 1;
@@ -158,7 +157,7 @@ void sleep (fsm_t* this) { // led orange
 void init_adc (fsm_t* this) {
 	HAL_ADC_Stop(&hadc1);
 
-	adc_timer = HAL_GetTick() + 1000;
+	adc_timer = HAL_GetTick() + adc_setup_time;
 
 }
 
@@ -173,9 +172,7 @@ void setting_up (fsm_t* this) {
 	config->setup_timer = HAL_GetTick() + config->setup_period;
 	HAL_GPIO_WritePin(GPIOD, config->supply_Pin, SET);
 
-	//if (config->adc_channel == 1)
-		HAL_ADC_Start(&hadc1);
-	//else HAL_ADC_Start(&hadc2);
+	HAL_ADC_Start(&hadc1);
 
 	config->measuring = TRUE;
 	config->sleeping = FALSE;
@@ -195,22 +192,23 @@ void save_data (fsm_t* this)
 	data2save.measure = config->data_average;
 	data2save.threshold_H = config->threshold_H;
 	data2save.threshold_L = config->threshold_L;
-//	data2save.timestamp =
 
 	save_new_data(data2save);
+
+	data_saved_flg = TRUE;
 }
 
 fsm_trans_t trans_sensor[] = {
-  { Pre_setup, timer_adc,     Setup,      setting_up},
-  { Setup,    timer_setup,   Measure,  measuring},
-  { Measure,  timer_measure, Process,  process_data},
-  //{ Measure,  contador,      Process,  process_data},
-  { Process,  error,         Warning,  alert},
-  { Process,  no_error,      Saving,   save_data},
-  { Warning,  warned, 		 Measure,  measuring},
-  { Warning,  warning_limit, Saving,   save_data},
-  { Saving,   data_saved,    Sleeping, sleep},
-  { Sleeping,  timer_sleep,   Pre_setup,  init_adc},
+  { Pre_setup, timer_adc,      Setup,     setting_up},
+  { Setup,    timer_setup,     Measure,   measuring},
+  { Measure,  timer_measure,   Measure,   measuring},
+  { Measure,  average_counter, Process,   process_data},
+  { Process,  error,           Warning,   alert},
+  { Process,  no_error,        Saving,    save_data},
+  { Warning,  warned, 		   Measure,   measuring},
+  { Warning,  warning_limit,   Saving,    save_data},
+  { Saving,   data_saved,      Sleeping,  sleep},
+  { Sleeping,  timer_sleep,    Pre_setup, init_adc},
   {-1, NULL, -1, NULL },
 };
 
@@ -227,8 +225,12 @@ void fsm_sensor_init (fsm_sensor_t* f, sensor_t* c) {
   f->param = c;
 }
 
-
-void sensor_initialization(sensor_t* sensor, uint16_t Device_ID, uint8_t Sensor_ID, uint16_t supply_Pin, uint8_t adc_channel, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average)
+/**
+  * @brief  Initialize the sensor to the params defined.
+  * @param  Sensor initial parameters defined in main.c in macros.
+  * @retval None
+  */
+void sensor_initialization(sensor_t* sensor, uint16_t Device_ID, uint8_t Sensor_ID, uint16_t supply_Pin, uint16_t threshold_L, uint16_t threshold_H, uint16_t threshold_Max, uint16_t setup_period, uint16_t sleep_period, uint16_t measure_period, uint16_t measure_average)
 {
 	/*SENSOR CONTROL*/
 	sensor->active = TRUE;
@@ -248,7 +250,6 @@ void sensor_initialization(sensor_t* sensor, uint16_t Device_ID, uint8_t Sensor_
 	sensor->Device_ID = Device_ID;
 	sensor->Sensor_ID = Sensor_ID;
 	sensor->supply_Pin = supply_Pin;
-	sensor->adc_channel = adc_channel;
 	sensor->threshold_L = threshold_L;
 	sensor->threshold_H = threshold_H;
 	sensor->threshold_Max = threshold_Max;

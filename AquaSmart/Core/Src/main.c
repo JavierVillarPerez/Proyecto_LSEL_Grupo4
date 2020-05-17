@@ -44,20 +44,19 @@
 /* USER CODE BEGIN PD */
 #define PORT 8080
 
+/*Task times*/
 #define SENSOR1_TIME 	 400
 #define SENSOR2_TIME 	 500
 #define LEDS_TIME	 	 300
 #define SEND_DATA_TIME	 10000
 
-
-#define ADC_Channel1 1
-#define ADC_Channel2 2
-#define ADC_Channel3 3
-#define ADC_Channel4 4
-
-
+/*ID for device*/
 #define ID_Device 1
 
+/*Number of defined sensors*/
+#define NUMBER_OF_SENSORS 2
+
+/*Sensor 1 parameters*/
 #define ID_ph_sensor 1
 
 #define range_ph_basico 600 	 	// Only for test, real value is 2.
@@ -67,9 +66,9 @@
 #define ph_measure_period 600	// Test time to measure.
 #define ph_sleep_period 1500	// Test time to sleep
 #define ph_setup_period 500		// Test time to setting up
-#define ph_average 4			// number of measurements to make for 1 measure.
+#define ph_average 2			// number of measurements to make for 1 measure.
 
-/*Turbidity sensor params*/
+/*Sensor 2 parameters*/
 #define ID_turbidity_sensor 2
 
 #define range_turb_min 600  	 	// Only for test.
@@ -79,10 +78,9 @@
 #define turb_measure_period 700	// Test time to measure.
 #define turb_sleep_period 1500	// Test time to sleep
 #define turb_setup_period 500	// Test time to setting up
-#define turb_average 4			// number of measurements to make for 1 measure.
+#define turb_average 2			// number of measurements to make for 1 measure.
 
 
-#define NUMBER_OF_SENSORS 2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -320,7 +318,7 @@ void StartDefaultTask(void *argument)
 /* USER CODE BEGIN Header_StartTaskSensor1 */
 /**
 * @brief Function implementing the myTaskSensor1 thread.
-* @param argument: Not used
+* @param argument: fsm_s1, FSM for sensor 1.
 * @retval None
 */
 /* USER CODE END Header_StartTaskSensor1 */
@@ -335,17 +333,17 @@ void StartTaskSensor1(void *argument)
 
     fsm_sensor_t* fsm_s1 = (fsm_sensor_t*)argument;
 
-    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, ADC_Channel1, range_ph_basico, range_ph_acido, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
+    sensor_initialization(&sensor1, ID_Device, ID_ph_sensor, Sensor1_Supply_Pin, range_ph_basico, range_ph_acido, range_ph_max, ph_setup_period, ph_sleep_period, ph_measure_period, ph_average);
     fsm_sensor_init(fsm_s1, &sensor1);
 
     tDelay = osKernelGetTickCount();
 /* Infinite loop */
-  /* Infinite loop */
   for(;;)
   {
 
-	/*Select ADC Channel 1*/
-
+	/* Select ADC Channel 1
+    *  The measurement needs an ADC channel change, so, this
+    * check, ensure the complete ADC conversión without channel change*/
 	if(fsm_s1->fsm.current_state <= 4 && sensor2_ON == FALSE)
 	{
 		sensor1_ON = TRUE;
@@ -371,7 +369,6 @@ void StartTaskSensor1(void *argument)
 		osMessageQueuePut (myQueueSensor1Handle, fsm_s1->param, 0, 0);
 		osMessageQueuePut(myQueueDataSavedHandle, (t_bool*) &sensor1_measured, 0, 0);
 	}
-	//	HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
     tDelay += pdMS_TO_TICKS(SENSOR1_TIME);
     osDelayUntil(tDelay);
   }
@@ -399,7 +396,7 @@ void StartTaskLoRa(void *argument)
 	/*master 1 for all devices, 0 for GW*/
 	master = 1;
 
-	Lora_inicio(master);  //0 es esclavo, 1 es maestro
+	Lora_inicio(master);
 
   /* Infinite loop */
   for(;;)
@@ -408,8 +405,9 @@ void StartTaskLoRa(void *argument)
 	osMessageQueueGet(myQueueDataSavedHandle, &sensor2_state, 0, 0);
 	if (master == 1)
 	{
+		/*Check if at least, one measure for every sensor has been made
+		 * to ensure data in the ringbuf*/
 		if(sensor1_state && sensor2_state)
-	//	if(sensor1_state)
 		{
 			for(uint8_t i = 0; i<NUMBER_OF_SENSORS; i++)
 			{
@@ -430,7 +428,7 @@ void StartTaskLoRa(void *argument)
 /* USER CODE BEGIN Header_StartTaskSensor2 */
 /**
 * @brief Function implementing the myTaskSensor2 thread.
-* @param argument: Not used
+* @param argument: fsm_s2, FSM for sensor 2.
 * @retval None
 */
 /* USER CODE END Header_StartTaskSensor2 */
@@ -445,15 +443,17 @@ void StartTaskSensor2(void *argument)
 
 	fsm_sensor_t* fsm_s2 = (fsm_sensor_t*)argument;
 
-    sensor_initialization(&sensor2, ID_Device, ID_turbidity_sensor, Sensor2_Supply_Pin, ADC_Channel2, range_turb_min, range_turb_basico, range_turb_max, turb_setup_period, turb_sleep_period, turb_measure_period, turb_average);
+    sensor_initialization(&sensor2, ID_Device, ID_turbidity_sensor, Sensor2_Supply_Pin, range_turb_min, range_turb_basico, range_turb_max, turb_setup_period, turb_sleep_period, turb_measure_period, turb_average);
 	fsm_sensor_init(fsm_s2, &sensor2);
 
 	tDelay = osKernelGetTickCount();
 	/* Infinite loop */
-	/* Infinite loop */
 	for(;;)
 	{
-		/*Select ADC Channel 2*/
+
+		/* Select ADC Channel 2
+	     *  The measurement needs an ADC channel change, so, this
+	     *  check, ensure the complete ADC conversión without channel change*/
 		if(fsm_s2->fsm.current_state <= 4 && sensor1_ON == FALSE)
 		{
 			sensor2_ON = TRUE;
@@ -538,6 +538,7 @@ void StartTaskLEDs(void *argument)
 			}
 		}
 
+		/*ORANGE LED => ALARM FOR WATER QUALITY*/
 		if(sensor1.alarm == TRUE || sensor2.alarm == TRUE) HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, SET);
 		else HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, RESET);
 
@@ -547,12 +548,23 @@ void StartTaskLEDs(void *argument)
   /* USER CODE END StartTaskLEDs */
 }
 
+/**
+  * @brief  Save data into the ring buffer.
+  * @param: sensor data type sensor_buf_t to send
+  * 				 by wireless communication.
+  * @retval None
+  */
 void save_new_data(sensor_buf_t data)
 {
-
 	ringbuf_put(&data_ring_buff, data);
 }
 
+
+/**
+  * @brief  Initialize the LoRa device.
+  * @param: flag to indicate if master or slave functionality.
+  * @retval None
+  */
 void Lora_inicio(int init){
 	int ret;
 	//initialize LoRa module
@@ -577,6 +589,13 @@ void Lora_inicio(int init){
 		}
 	}
 }
+
+
+/**
+  * @brief  Read data from LoRa device.
+  * @param  None
+  * @retval None
+  */
 void Lora_recibe(void){
 	int ret;
 	char buffer[64];
@@ -585,6 +604,14 @@ void Lora_recibe(void){
 		SX1278_read(&SX1278, (uint8_t *) buffer, ret);
 	}
 }
+
+
+/**
+  * @brief  Read data from ring buffer and send it through LoRa device.
+  * @param  None
+  * @retval None
+  */
+
 void Lora_envia(void){
 	int ret;
 	char buffer[64];
