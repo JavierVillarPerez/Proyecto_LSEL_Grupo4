@@ -2,42 +2,38 @@
 %THINGSPEAK
 
 % Lectura del canal (sensor de temperatura)
-readChannelID = 12397;
+readChannelID = 1006531;
 % Campo que guarda la temperatura:
-TemperatureFieldID = 4; 
+pHID = 1; 
 
 % Lectura en nuestro canal: 
 readAPIKey = '3BV8ZQ76RFG28J78'; 
 
 %% Lectura de los datos %%
-%% 60 muestras => 1 hora
-tiempo = 12; %En horas
-samples = 60*tiempo;
+ 
+samples = 15;
 lim_sup = 80;
 lim_inf = 10;
-[data, time] = thingSpeakRead(readChannelID, 'Field', TemperatureFieldID, 'NumPoints', samples, 'ReadKey', readAPIKey);
+[data, time] = thingSpeakRead(readChannelID, 'Field', pHID, 'NumPoints', samples, 'ReadKey', readAPIKey)
 
 %% Representación de los datos %%
 
 figure
-plot(time, data, 'k')
-ylim([5 120])
+plot(time, data, '-.k.')
+ylim([5 140])
 xlabel('Time')
 ylabel('pH')
 
 yline(lim_sup, '--r*')
 yline(lim_inf, '--m*')
 
-suma = 0;
 
 %%Hacer la media de los valores para representar la recta
 
-for i = 1:samples
-    suma = data(i) + suma;
-end
-
-media = suma/samples;
+media = nanmean(data)
 
 yline(media, 'b')
 
 legend('pH','Límite potabilidad sup','Límite potabilidad inf','Media valores')
+
+

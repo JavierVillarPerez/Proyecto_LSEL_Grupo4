@@ -1,66 +1,131 @@
 import thingspeak
+import telegram
+from telegram.update import Update
+from telegram.ext.callbackcontext import CallbackContext
+from telegram.bot import Bot
+from telegram.parsemode import ParseMode
 import time
-import ctypes
-import struct
-import datetime
 
+token = '1245262637:AAGFfXDyh3wM4cFpnAiYa8cIM8bKXRXjecs'
+bot = telegram.Bot(token)
 
-class MyStruct(ctypes.Structure):
-    _fields_ = [
-        ("ID", ctypes.c_ushort),
-        ("measure", ctypes.c_ushort),
-        ("alarm", ctypes.c_bool),
-        ("error", ctypes.c_bool),
-        ("threshold_L", ctypes.c_ushort),
-        ("threshold_H", ctypes.c_ushort),
-        ("year", ctypes.c_int),
-        ("month", ctypes.c_int),
-        ("day", ctypes.c_int),
-        ("hour", ctypes.c_int),
-        ("minutes", ctypes.c_int),
-    ]
+state_fuente_1 = 0
+state_fuente_2 = 0
+
+channel_id_1 = 1006531
+write_key_1 = '49BYVNFYXCNCIM9Y'
+
+channel_id_2 = 1006531
+write_key_2 = '49BYVNFYXCNCIM9Y'
 
 
 def process_d(data):
-    channel_id = 1006531
-    write_key = '49BYVNFYXCNCIM9Y'
-    # read_key = '3BV8ZQ76RFG28J78'
-    x = MyStruct()
-    fmt_size = struct.calcsize("HH??HHiiiii")
-    x.ID, x.measure, x.alarm, x.error, x.threshold_L, x.threshold_H, x.year, x.month, x.day, x.hour, x.minutes = struct.unpack("HH??HHiiiii", data[:fmt_size])
-    update_channel(x.ID, channel_id, write_key, x.measure)
-    fuente = 1
+    data_proc = data.split()
+    device_id = int(data_proc[1])
+    sensor_id = int(data_proc[2])
+    data_measure = float(data_proc[3])
+    data_alarm = int(data_proc[4])
+    data_error = int(data_proc[5])
 
-    if x.threshold_H > x.measure > x.threshold_L:
-        potable = 1
+    print("valores recibidos")
+    print(device_id)
+    print(sensor_id)
+    print(data_measure)
+    print(data_alarm)
+    print(data_error)
+
+    update_device(device_id, sensor_id, data_measure, data_alarm, data_error)
+
+
+def update_device(id_device, id_sensor, measure, data_alarm, data_error):
+    if id_device == 1:
+        one(channel_id_1, write_key_1, id_sensor, measure, data_alarm, data_error)
+    elif id_device == 2:
+        two(channel_id_2, write_key_2, id_sensor, measure, data_alarm, data_error)
     else:
-        potable = 0
-
-    return fuente, potable
+        print("Fuente no existente")
 
 
-def update_channel(id_sensor, id_channel, api_key_channel, measure):
-    switcher = {
-        1: one(id_channel, api_key_channel, measure),
-        2: two(id_channel, api_key_channel, measure),
-        3: three(id_channel, api_key_channel, measure)
-    }
-    switcher.get(id_sensor)
-
-
-def one(id_channel, api_key_channel, measure):
+def one(id_channel, api_key_channel, id_sensor, measure, data_alarm, data_error):
+    global state_fuente_1
     channel = thingspeak.Channel(id=id_channel, api_key=api_key_channel)
-    channel.update({'field1': measure})
-    time.sleep(15)
+    if data_error == 1:
+        print('Error de lectura')
+    else:
+        if id_sensor == 1:
+            if data_alarm == 1:
+                bot.send_message(chat_id='1083405023',
+                                 text="Fuente 1 con valores de pH fuera de rango")
+                state_fuente_1 = 0
+                channel.update({'field1': measure})
+            else:
+                channel.update({'field1': measure})
+                state_fuente_1 = 1
+        elif id_sensor == 2:
+            if data_alarm == 1:
+                bot.send_message(chat_id='1083405023',
+                                 text="Fuente 1 con valores de turbidez fuera de rango")
+                state_fuente_1 = 0
+                channel.update({'field2': measure})
+            else:
+                channel.update({'field2': measure})
+                state_fuente_1 = 1
 
 
-def two(id_channel, api_key_channel, measure):
+
+def two(id_channel, api_key_channel, id_sensor, measure, data_alarm, data_error):
+    global state_fuente_2
     channel = thingspeak.Channel(id=id_channel, api_key=api_key_channel)
-    channel.update({'field2': measure})
-    time.sleep(15)
+    if data_error == 1:
+        print('Error de lectura')
+    else:
+        if id_sensor == 1:
+            if data_alarm == 1:
+                bot.send_message(chat_id='1083405023',
+                                 text="Fuente 2 con valores de pH fuera de rango")
+                state_fuente_2 = 0
+                channel.update({'field1': measure})
+            else:
+                channel.update({'field1': measure})
+                state_fuente_2 = 1
+        elif id_sensor == 2:
+            if data_alarm == 1:
+                bot.send_message(chat_id='1083405023',
+                                 text="Fuente 2 con valores de turbidez fuera de rango")
+                state_fuente_2 = 0
+                channel.update({'field2': measure})
+            else:
+                channel.update({'field2': measure})
+                state_fuente_2 = 1
 
 
-def three(id_channel, api_key_channel, measure):
-    channel = thingspeak.Channel(id=id_channel, api_key=api_key_channel)
-    channel.update({'field3': measure})
-    time.sleep(15)
+def fuente_1(update: Update, context: CallbackContext):
+    bot: Bot = context.bot
+    if state_fuente_1 == 1:
+        bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Agua apta para el consumo",
+            parse_mode=ParseMode.HTML,
+        )
+    elif state_fuente_1 == 0:
+        bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Agua NO apta para el consumo",
+            parse_mode=ParseMode.HTML,
+        )
+
+
+def fuente_2(update: Update, context: CallbackContext):
+    bot: Bot = context.bot
+    if state_fuente_2 == 1:
+        bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Agua apta para el consumo",
+            parse_mode=ParseMode.HTML,
+        )
+    elif state_fuente_2 == 0:
+        bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Agua NO apta para el consumo",
+            parse_mode=ParseMode.HTML,
+        )
