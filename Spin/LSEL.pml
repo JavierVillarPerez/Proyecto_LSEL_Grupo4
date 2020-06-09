@@ -1,11 +1,3 @@
-/* ltl spec{
-	[] ((state.measure == 1) -> <> (state.measure = 0 && state.process = 1)) &&
-	[] (((state.process == 1) && [](error)) -> <> (state.process = 0 && warning = 1)) &&
-	[] (((state.process == 1) && [](!error)) -> <> (state.process = 0 && state.sleep = 1)) &&
-	[] ([](state.warning == 1) -> <>[] (alert = 1) &&
-	[] ((state.warning == 1) -> <> (state.warning = 0 && state.measure = 1)) &&
-	[] ((state.warning == 1 && [](limit)) -> <> (state.warning = 0 && state.sleep = 1)) &&
-}*/
 #define s_sleep 0
 #define s_setup 1
 #define s_measure 2
@@ -22,13 +14,6 @@ ltl p_error2 {
 ltl p_error3{
         [] (((state == s_process) && [](!range)) -> <> (state == s_sleep))
 }
-
-
-#define s_sleep 0
-#define s_setup 1
-#define s_measure 2
-#define s_process 3
-#define s_warning 4
 
 #define warning_limit 2
 
